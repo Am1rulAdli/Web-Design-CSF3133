@@ -4,7 +4,7 @@ Browse the customer menu, build a pre-order, and reserve a table. The checkout i
 
 ## Choose a website
 
-### [Customer website — menu & table booking](https://am1ruladli.github.io/Web-Design-CSF3133/)
+### [Customer website — menu & table booking](https://am1ruladli.github.io/Web-Design-CSF3133/customer.html)
 
 Browse the menu, adjust cart quantities, add notes to items, and reserve a table. Confirming a reservation opens the demo card or e-wallet checkout.
 
