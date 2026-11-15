@@ -195,6 +195,8 @@ window.recalcMenuPreOrder = function () {
 window.resetMenuPreOrder = function () {
   cartQuantities = Object.create(null);
   cartTouchedItems = Object.create(null);
+  var noteFields = document.querySelectorAll(".preorder-note");
+  for (var i = 0; i < noteFields.length; i++) noteFields[i].value = "";
   if (cartToastTimer) window.clearTimeout(cartToastTimer);
   cartToastTimer = null;
   var toast = document.getElementById("cart-toast");
@@ -217,6 +219,16 @@ window.updateReservationEstimate = function () {
   if (estZoneEl) estZoneEl.textContent = "RM " + zoneFee.toFixed(2);
   if (estFoodEl) estFoodEl.textContent = "RM " + foodTotal.toFixed(2);
   if (estGrandEl) estGrandEl.textContent = "RM " + grand.toFixed(2);
+};
+
+window.setManagementStatus = function (button) {
+  if (!button) return;
+  var group = button.parentNode;
+  if (!group || !group.classList.contains("status-choice-group")) return;
+  var choices = group.querySelectorAll(".status-choice");
+  for (var i = 0; i < choices.length; i++) {
+    choices[i].setAttribute("aria-pressed", choices[i] === button ? "true" : "false");
+  }
 };
 
 window.handleZoneFilter = function (sel) {
@@ -253,7 +265,11 @@ window.handleReservationSubmit = function (e) {
   var orderedItems = [];
   for (var i = 0; i < products.length; i++) {
     var quantity = cartQuantities[products[i].id] || 0;
-    if (quantity > 0) orderedItems.push(products[i].name + " (" + quantity + ")");
+    if (quantity > 0) {
+      var noteField = document.getElementById("preorder-note-" + products[i].id);
+      var note = noteField ? noteField.value.trim() : "";
+      orderedItems.push(products[i].name + " (" + quantity + ")" + (note ? " — Note: " + note : ""));
+    }
   }
   var orderText = orderedItems.length ? " Pre-Order: " + orderedItems.join(", ") + "." : " No pre-order items selected.";
 
@@ -261,6 +277,7 @@ window.handleReservationSubmit = function (e) {
     feedbackBox.textContent = "Reservation Confirmed at Hijayu Cafe for " + nameVal + " (" + guestsVal + " pax) on " + dateVal + " at " + timeVal + "." + orderText + " Estimated Total: " + totalText + ". Booking Reference #HJ-202688 recorded.";
     feedbackBox.classList.add("visible");
   }
+  window.resetMenuPreOrder();
   return false;
 };
 
@@ -277,6 +294,12 @@ window.handleReservationReset = function () {
 
 document.addEventListener("DOMContentLoaded", function () {
   window.renderCart();
+  var statusButtons = document.querySelectorAll(".status-choice");
+  for (var i = 0; i < statusButtons.length; i++) {
+    statusButtons[i].addEventListener("click", function () {
+      window.setManagementStatus(this);
+    });
+  }
 });
 
   </script>
@@ -905,6 +928,92 @@ body {
   cursor: pointer;
 }
 
+.reservation-preorder-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.reservation-preorder-item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.preorder-note-label {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.preorder-note {
+  min-height: 54px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.preorder-note:focus {
+  outline: none;
+  border-color: var(--caramel-gold);
+  box-shadow: 0 0 0 3px rgba(200, 125, 50, 0.15);
+}
+
+.status-choice-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 190px;
+}
+
+.status-choice {
+  padding: 6px 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background-color: #FFFFFF;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.status-choice:hover {
+  border-color: var(--espresso-mid);
+}
+
+.status-choice[aria-pressed="true"] {
+  border-color: var(--espresso-mid);
+  background-color: var(--espresso-mid);
+  color: #FFFFFF;
+  box-shadow: var(--shadow-sm);
+}
+
+.status-choice[data-status="Available"][aria-pressed="true"],
+.status-choice[data-status="Ready to Serve"][aria-pressed="true"],
+.status-choice[data-status="Served"][aria-pressed="true"],
+.status-choice[data-status="Paid"][aria-pressed="true"] {
+  border-color: #166534;
+  background-color: #166534;
+}
+
+.status-choice[data-status="Reserved"][aria-pressed="true"],
+.status-choice[data-status="Preparing"][aria-pressed="true"],
+.status-choice[data-status="Pending"][aria-pressed="true"] {
+  border-color: #92400E;
+  background-color: #92400E;
+}
+
+.status-choice[data-status="Occupied"][aria-pressed="true"],
+.status-choice[data-status="Refunded"][aria-pressed="true"] {
+  border-color: #991B1B;
+  background-color: #991B1B;
+}
+
 .form-actions {
   display: flex;
   gap: 12px;
@@ -1435,17 +1544,6 @@ label.btn {
   display: none;
 }
 
-/* 6. Pure-CSS Management Table & Order Status Toggle Fallback */
-.mgmt-toggle-cb:checked ~ td .state-default {
-  display: none;
-}
-.mgmt-toggle-cb:not(:checked) ~ td .state-toggled {
-  display: none;
-}
-.mgmt-toggle-cb:checked ~ td .state-toggled {
-  display: inline-block;
-}
-
 /* 7. Pure-CSS Reservation Confirm Modal/Banner Toggle */
 #res-confirm-toggle:checked ~ .feedback-banner {
   display: block !important;
@@ -1464,7 +1562,7 @@ label.btn {
 
   <div class="top-utility-bar">
     <span>Open Mon&ndash;Thu, Sat&ndash;Sun: 12:30 PM &ndash; 10:30 PM (Closed Friday) | Lot 16716, Kg. Sepetir Rendang, Kuala Nerus</span>
-    <span>Direct Booking Desk: <a href="mailto:reservations@hijayucafe.my">reservations@hijayucafe.my</a> | Tel / WhatsApp: +60 19-925 7053</span>
+    <span>Booking Desk Tel / WhatsApp: +60 19-925 7053</span>
   </div>
 
   <header class="site-header">
@@ -1795,54 +1893,82 @@ label.btn {
             <div class="form-group">
               <label>8. Pre-Order Signature Hijayu Items (Optional)</label>
               <div class="reservation-cart-list">
-                <div class="reservation-cart-item cart-quantity-control" data-cart-item="green-fried-rice" data-item-name="Hijayu Green Fried Rice" data-item-price="21.00">
-                  <span class="reservation-cart-name">Hijayu Green Fried Rice (RM 21.00)</span>
-                  <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Green Fried Rice" onclick="window.changeCartQuantity('green-fried-rice', -1);">−1</button>
-                  <span class="cart-quantity" aria-live="polite">0</span>
-                  <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Green Fried Rice to pre-order" onclick="window.changeCartQuantity('green-fried-rice', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="green-fried-rice" data-item-name="Hijayu Green Fried Rice" data-item-price="21.00">
+                    <span class="reservation-cart-name">Hijayu Green Fried Rice (RM 21.00)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Green Fried Rice" onclick="window.changeCartQuantity('green-fried-rice', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Green Fried Rice to pre-order" onclick="window.changeCartQuantity('green-fried-rice', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-green-fried-rice">Notes for Hijayu Green Fried Rice</label>
+                  <textarea id="preorder-note-green-fried-rice" class="preorder-note" name="preorder_notes[green-fried-rice]" rows="2" placeholder="Spice level, ingredients, or other requests for this dish"></textarea>
                 </div>
-                <div class="reservation-cart-item cart-quantity-control" data-cart-item="siakap-green-curry" data-item-name="Hijayu Siakap Green Curry" data-item-price="61.00">
-                  <span class="reservation-cart-name">Hijayu Siakap Green Curry (RM 61.00)</span>
-                  <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Siakap Green Curry" onclick="window.changeCartQuantity('siakap-green-curry', -1);">−1</button>
-                  <span class="cart-quantity" aria-live="polite">0</span>
-                  <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Siakap Green Curry to pre-order" onclick="window.changeCartQuantity('siakap-green-curry', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="siakap-green-curry" data-item-name="Hijayu Siakap Green Curry" data-item-price="61.00">
+                    <span class="reservation-cart-name">Hijayu Siakap Green Curry (RM 61.00)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Siakap Green Curry" onclick="window.changeCartQuantity('siakap-green-curry', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Siakap Green Curry to pre-order" onclick="window.changeCartQuantity('siakap-green-curry', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-siakap-green-curry">Notes for Hijayu Siakap Green Curry</label>
+                  <textarea id="preorder-note-siakap-green-curry" class="preorder-note" name="preorder_notes[siakap-green-curry]" rows="2" placeholder="Spice level, ingredients, or other requests for this dish"></textarea>
                 </div>
-                <div class="reservation-cart-item cart-quantity-control" data-cart-item="chicken-wings" data-item-name="Hijayu Chicken Wings" data-item-price="20.00">
-                  <span class="reservation-cart-name">Hijayu Chicken Wings (RM 20.00)</span>
-                  <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Chicken Wings" onclick="window.changeCartQuantity('chicken-wings', -1);">−1</button>
-                  <span class="cart-quantity" aria-live="polite">0</span>
-                  <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Chicken Wings to pre-order" onclick="window.changeCartQuantity('chicken-wings', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="chicken-wings" data-item-name="Hijayu Chicken Wings" data-item-price="20.00">
+                    <span class="reservation-cart-name">Hijayu Chicken Wings (RM 20.00)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Chicken Wings" onclick="window.changeCartQuantity('chicken-wings', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Chicken Wings to pre-order" onclick="window.changeCartQuantity('chicken-wings', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-chicken-wings">Notes for Hijayu Chicken Wings</label>
+                  <textarea id="preorder-note-chicken-wings" class="preorder-note" name="preorder_notes[chicken-wings]" rows="2" placeholder="Spice level, ingredients, or other requests for this dish"></textarea>
                 </div>
-                <div class="reservation-cart-item cart-quantity-control" data-cart-item="best-friend" data-item-name="Hijayu Best Friend" data-item-price="20.00">
-                  <span class="reservation-cart-name">Hijayu Best Friend (RM 20.00)</span>
-                  <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Best Friend" onclick="window.changeCartQuantity('best-friend', -1);">−1</button>
-                  <span class="cart-quantity" aria-live="polite">0</span>
-                  <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Best Friend to pre-order" onclick="window.changeCartQuantity('best-friend', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="best-friend" data-item-name="Hijayu Best Friend" data-item-price="20.00">
+                    <span class="reservation-cart-name">Hijayu Best Friend (RM 20.00)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Best Friend" onclick="window.changeCartQuantity('best-friend', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Best Friend to pre-order" onclick="window.changeCartQuantity('best-friend', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-best-friend">Notes for Hijayu Best Friend</label>
+                  <textarea id="preorder-note-best-friend" class="preorder-note" name="preorder_notes[best-friend]" rows="2" placeholder="Spice level, ingredients, or other requests for this dish"></textarea>
                 </div>
-                <div class="reservation-cart-item cart-quantity-control" data-cart-item="pandan-lemonade" data-item-name="Hijayu Pandan Lemonade" data-item-price="15.50">
-                  <span class="reservation-cart-name">Hijayu Pandan Lemonade (RM 15.50)</span>
-                  <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Pandan Lemonade" onclick="window.changeCartQuantity('pandan-lemonade', -1);">−1</button>
-                  <span class="cart-quantity" aria-live="polite">0</span>
-                  <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Pandan Lemonade to pre-order" onclick="window.changeCartQuantity('pandan-lemonade', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="pandan-lemonade" data-item-name="Hijayu Pandan Lemonade" data-item-price="15.50">
+                    <span class="reservation-cart-name">Hijayu Pandan Lemonade (RM 15.50)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Pandan Lemonade" onclick="window.changeCartQuantity('pandan-lemonade', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Pandan Lemonade to pre-order" onclick="window.changeCartQuantity('pandan-lemonade', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-pandan-lemonade">Notes for Hijayu Pandan Lemonade</label>
+                  <textarea id="preorder-note-pandan-lemonade" class="preorder-note" name="preorder_notes[pandan-lemonade]" rows="2" placeholder="Sweetness, ice, or other requests for this drink"></textarea>
                 </div>
-                <div class="reservation-cart-item cart-quantity-control" data-cart-item="strawberry-coffee" data-item-name="Hijayu Strawberry Coffee" data-item-price="15.50">
-                  <span class="reservation-cart-name">Hijayu Strawberry Coffee (RM 15.50)</span>
-                  <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Strawberry Coffee" onclick="window.changeCartQuantity('strawberry-coffee', -1);">−1</button>
-                  <span class="cart-quantity" aria-live="polite">0</span>
-                  <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Strawberry Coffee to pre-order" onclick="window.changeCartQuantity('strawberry-coffee', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="strawberry-coffee" data-item-name="Hijayu Strawberry Coffee" data-item-price="15.50">
+                    <span class="reservation-cart-name">Hijayu Strawberry Coffee (RM 15.50)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Strawberry Coffee" onclick="window.changeCartQuantity('strawberry-coffee', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Strawberry Coffee to pre-order" onclick="window.changeCartQuantity('strawberry-coffee', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-strawberry-coffee">Notes for Hijayu Strawberry Coffee</label>
+                  <textarea id="preorder-note-strawberry-coffee" class="preorder-note" name="preorder_notes[strawberry-coffee]" rows="2" placeholder="Sweetness, ice, or other requests for this drink"></textarea>
                 </div>
-                <div class="reservation-cart-item cart-quantity-control" data-cart-item="pandan-mix-fruit" data-item-name="Hijayu Pandan Mix Fruit" data-item-price="15.50">
-                  <span class="reservation-cart-name">Hijayu Pandan Mix Fruit (RM 15.50)</span>
-                  <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Pandan Mix Fruit" onclick="window.changeCartQuantity('pandan-mix-fruit', -1);">−1</button>
-                  <span class="cart-quantity" aria-live="polite">0</span>
-                  <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Pandan Mix Fruit to pre-order" onclick="window.changeCartQuantity('pandan-mix-fruit', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="pandan-mix-fruit" data-item-name="Hijayu Pandan Mix Fruit" data-item-price="15.50">
+                    <span class="reservation-cart-name">Hijayu Pandan Mix Fruit (RM 15.50)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Pandan Mix Fruit" onclick="window.changeCartQuantity('pandan-mix-fruit', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Pandan Mix Fruit to pre-order" onclick="window.changeCartQuantity('pandan-mix-fruit', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-pandan-mix-fruit">Notes for Hijayu Pandan Mix Fruit</label>
+                  <textarea id="preorder-note-pandan-mix-fruit" class="preorder-note" name="preorder_notes[pandan-mix-fruit]" rows="2" placeholder="Sweetness, ice, or other requests for this drink"></textarea>
                 </div>
               </div>
             </div>
 
             <div class="form-group">
-              <label for="res-notes">9. Special Dietary Requests &amp; Table Notes (Scrolling Text Box)</label>
-              <textarea id="res-notes" name="special_requests" rows="4" class="form-control" placeholder="Specify spice level (e.g. kurang pedas for Green Fried Rice), extra sambal, baby chair requests, or preferred table number (e.g. Table T-04)..."></textarea>
+              <label for="res-notes">9. Special Requests for the Table (Optional)</label>
+              <textarea id="res-notes" name="special_requests" rows="3" class="form-control" placeholder="Add seating requests, baby chair needs, or other notes for your table..."></textarea>
             </div>
 
             <div class="form-actions">
@@ -1878,7 +2004,7 @@ label.btn {
           <div class="card">
             <span class="card-tag">Booking Policy</span>
             <h3>Table Hold &amp; Cancellation Guidelines</h3>
-            <p>Reserved tables at Hijayu Caf&eacute; are held for 15 minutes past the scheduled arrival time. To modify party size or cancel, please contact our desk at <strong>+60 19-925 7053</strong> or email <a href="mailto:reservations@hijayucafe.my">reservations@hijayucafe.my</a>.</p>
+            <p>Reserved tables at Hijayu Caf&eacute; are held for 15 minutes past the scheduled arrival time. To modify party size or cancel, please contact our desk at <strong>+60 19-925 7053</strong>.</p>
           </div>
         </div>
       </section>
@@ -2160,7 +2286,7 @@ label.btn {
 
       <div class="table-container">
         <table class="data-table">
-          <caption>Live Table Allocation Controller at Hijayu Caf&eacute; (Click "Cycle Status" to Update Floor State)</caption>
+          <caption>Live Table Allocation Controller at Hijayu Caf&eacute; (Choose a Status)</caption>
           <thead>
             <tr>
               <th scope="col">Table ID</th>
@@ -2168,69 +2294,73 @@ label.btn {
               <th scope="col">Assigned Guest / Booking Ref</th>
               <th scope="col">Check-In Slot</th>
               <th scope="col">Current Floor Status</th>
-              <th scope="col">Staff Action</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <input type="checkbox" id="m-cb-t02" class="gs-hidden-toggle mgmt-toggle-cb">
               <td><strong>T-02</strong></td>
               <td>Main Indoor Dining Hall</td>
               <td>Amirul Adli (#HJ-202601)</td>
               <td>12:30 PM (2 Pax)</td>
               <td>
-                <span class="status-badge status-reserved state-default">Reserved</span>
-                <span class="status-badge status-occupied state-toggled">Occupied (Checked In)</span>
+                <div class="status-choice-group" role="group" aria-label="Status for table T-02">
+                  <button type="button" class="status-choice" data-status="Available" aria-pressed="false">Available</button>
+                  <button type="button" class="status-choice" data-status="Reserved" aria-pressed="true">Reserved</button>
+                  <button type="button" class="status-choice" data-status="Occupied" aria-pressed="false">Occupied</button>
+                </div>
               </td>
-              <td><label for="m-cb-t02" class="btn btn-outline">Cycle Status</label></td>
             </tr>
             <tr>
-              <input type="checkbox" id="m-cb-t10" class="gs-hidden-toggle mgmt-toggle-cb">
               <td><strong>T-10</strong></td>
               <td>Main Indoor Booth (4-Seater)</td>
               <td>Muhammad Irfan (#HJ-202602)</td>
               <td>01:30 PM (4 Pax)</td>
               <td>
-                <span class="status-badge status-occupied state-default">Occupied</span>
-                <span class="status-badge status-available state-toggled">Available (Cleared)</span>
+                <div class="status-choice-group" role="group" aria-label="Status for table T-10">
+                  <button type="button" class="status-choice" data-status="Available" aria-pressed="false">Available</button>
+                  <button type="button" class="status-choice" data-status="Reserved" aria-pressed="false">Reserved</button>
+                  <button type="button" class="status-choice" data-status="Occupied" aria-pressed="true">Occupied</button>
+                </div>
               </td>
-              <td><label for="m-cb-t10" class="btn btn-outline">Cycle Status</label></td>
             </tr>
             <tr>
-              <input type="checkbox" id="m-cb-s01" class="gs-hidden-toggle mgmt-toggle-cb">
               <td><strong>S-01</strong></td>
               <td>Quiet Study &amp; Work Pod</td>
               <td>Nur Sorfina (#HJ-202603)</td>
               <td>03:00 PM (2 Pax)</td>
               <td>
-                <span class="status-badge status-reserved state-default">Reserved</span>
-                <span class="status-badge status-occupied state-toggled">Occupied (Checked In)</span>
+                <div class="status-choice-group" role="group" aria-label="Status for table S-01">
+                  <button type="button" class="status-choice" data-status="Available" aria-pressed="false">Available</button>
+                  <button type="button" class="status-choice" data-status="Reserved" aria-pressed="true">Reserved</button>
+                  <button type="button" class="status-choice" data-status="Occupied" aria-pressed="false">Occupied</button>
+                </div>
               </td>
-              <td><label for="m-cb-s01" class="btn btn-outline">Cycle Status</label></td>
             </tr>
             <tr>
-              <input type="checkbox" id="m-cb-g03" class="gs-hidden-toggle mgmt-toggle-cb">
               <td><strong>G-03</strong></td>
               <td>Cozy Garden Verandah</td>
               <td>Walk-In Available</td>
               <td>Immediate (4 Pax)</td>
               <td>
-                <span class="status-badge status-available state-default">Available</span>
-                <span class="status-badge status-occupied state-toggled">Occupied (Walk-In)</span>
+                <div class="status-choice-group" role="group" aria-label="Status for table G-03">
+                  <button type="button" class="status-choice" data-status="Available" aria-pressed="true">Available</button>
+                  <button type="button" class="status-choice" data-status="Reserved" aria-pressed="false">Reserved</button>
+                  <button type="button" class="status-choice" data-status="Occupied" aria-pressed="false">Occupied</button>
+                </div>
               </td>
-              <td><label for="m-cb-g03" class="btn btn-outline">Cycle Status</label></td>
             </tr>
             <tr>
-              <input type="checkbox" id="m-cb-fama" class="gs-hidden-toggle mgmt-toggle-cb">
               <td><strong>FAM-A</strong></td>
               <td>Family Siakap Dining Zone</td>
               <td>FSKM Software Eng. Group (#HJ-202605)</td>
               <td>06:30 PM (8 Pax)</td>
               <td>
-                <span class="status-badge status-reserved state-default">Reserved</span>
-                <span class="status-badge status-occupied state-toggled">Occupied (Checked In)</span>
+                <div class="status-choice-group" role="group" aria-label="Status for table FAM-A">
+                  <button type="button" class="status-choice" data-status="Available" aria-pressed="false">Available</button>
+                  <button type="button" class="status-choice" data-status="Reserved" aria-pressed="true">Reserved</button>
+                  <button type="button" class="status-choice" data-status="Occupied" aria-pressed="false">Occupied</button>
+                </div>
               </td>
-              <td><label for="m-cb-fama" class="btn btn-outline">Cycle Status</label></td>
             </tr>
           </tbody>
         </table>
@@ -2238,7 +2368,7 @@ label.btn {
 
       <div class="table-container">
         <table class="data-table">
-          <caption>Real-Time Kitchen Pre-Order Tracking &amp; Sales Ledger (Click "Advance Ticket" to Update Stage)</caption>
+          <caption>Real-Time Kitchen Pre-Order Tracking &amp; Sales Ledger (Choose Kitchen and Payment Status)</caption>
           <thead>
             <tr>
               <th scope="col">Ticket No.</th>
@@ -2246,57 +2376,89 @@ label.btn {
               <th scope="col">Pre-Ordered Hijayu Signature Items</th>
               <th scope="col">Order Total</th>
               <th scope="col">Kitchen Stage</th>
-              <th scope="col">Kitchen Action</th>
+              <th scope="col">Payment Status</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <input type="checkbox" id="m-cb-k881" class="gs-hidden-toggle mgmt-toggle-cb">
               <td><strong>#K-881</strong></td>
               <td>Table T-02 (12:30 PM)</td>
               <td>2x Hijayu Green Fried Rice (RM 42), 1x Hijayu Chicken Wings (RM 20), 2x Hijayu Pandan Lemonade (RM 31)</td>
               <td>RM 93.00</td>
               <td>
-                <span class="status-badge status-preparing state-default">Preparing in Kitchen</span>
-                <span class="status-badge status-available state-toggled">Ready to Serve &check;</span>
+                <div class="status-choice-group" role="group" aria-label="Kitchen status for ticket K-881">
+                  <button type="button" class="status-choice" data-status="Preparing" aria-pressed="true">Preparing</button>
+                  <button type="button" class="status-choice" data-status="Ready to Serve" aria-pressed="false">Ready</button>
+                  <button type="button" class="status-choice" data-status="Served" aria-pressed="false">Served</button>
+                </div>
               </td>
-              <td><label for="m-cb-k881" class="btn btn-outline">Advance Ticket</label></td>
+              <td>
+                <div class="status-choice-group" role="group" aria-label="Payment status for ticket K-881">
+                  <button type="button" class="status-choice" data-status="Pending" aria-pressed="true">Pending</button>
+                  <button type="button" class="status-choice" data-status="Paid" aria-pressed="false">Paid</button>
+                  <button type="button" class="status-choice" data-status="Refunded" aria-pressed="false">Refunded</button>
+                </div>
+              </td>
             </tr>
             <tr>
-              <input type="checkbox" id="m-cb-k882" class="gs-hidden-toggle mgmt-toggle-cb">
               <td><strong>#K-882</strong></td>
               <td>Table T-10 (01:30 PM)</td>
               <td>1x Hijayu Siakap Green Curry (RM 61), 1x Hijayu Best Friend (RM 20), 2x Hijayu Strawberry Coffee (RM 31)</td>
               <td>RM 112.00</td>
               <td>
-                <span class="status-badge status-available state-default">Ready to Serve</span>
-                <span class="status-badge status-reserved state-toggled">Completed &amp; Served &check;</span>
+                <div class="status-choice-group" role="group" aria-label="Kitchen status for ticket K-882">
+                  <button type="button" class="status-choice" data-status="Preparing" aria-pressed="false">Preparing</button>
+                  <button type="button" class="status-choice" data-status="Ready to Serve" aria-pressed="true">Ready</button>
+                  <button type="button" class="status-choice" data-status="Served" aria-pressed="false">Served</button>
+                </div>
               </td>
-              <td><label for="m-cb-k882" class="btn btn-outline">Advance Ticket</label></td>
+              <td>
+                <div class="status-choice-group" role="group" aria-label="Payment status for ticket K-882">
+                  <button type="button" class="status-choice" data-status="Pending" aria-pressed="true">Pending</button>
+                  <button type="button" class="status-choice" data-status="Paid" aria-pressed="false">Paid</button>
+                  <button type="button" class="status-choice" data-status="Refunded" aria-pressed="false">Refunded</button>
+                </div>
+              </td>
             </tr>
             <tr>
-              <input type="checkbox" id="m-cb-k883" class="gs-hidden-toggle mgmt-toggle-cb">
               <td><strong>#K-883</strong></td>
               <td>Pod S-01 (03:00 PM)</td>
               <td>1x Hijayu Best Friend (RM 20), 1x Hijayu Strawberry Coffee (RM 15.50), 1x Hijayu Pandan Mix Fruit (RM 15.50)</td>
               <td>RM 51.00</td>
               <td>
-                <span class="status-badge status-preparing state-default">Preparing in Kitchen</span>
-                <span class="status-badge status-available state-toggled">Ready to Serve &check;</span>
+                <div class="status-choice-group" role="group" aria-label="Kitchen status for ticket K-883">
+                  <button type="button" class="status-choice" data-status="Preparing" aria-pressed="true">Preparing</button>
+                  <button type="button" class="status-choice" data-status="Ready to Serve" aria-pressed="false">Ready</button>
+                  <button type="button" class="status-choice" data-status="Served" aria-pressed="false">Served</button>
+                </div>
               </td>
-              <td><label for="m-cb-k883" class="btn btn-outline">Advance Ticket</label></td>
+              <td>
+                <div class="status-choice-group" role="group" aria-label="Payment status for ticket K-883">
+                  <button type="button" class="status-choice" data-status="Pending" aria-pressed="true">Pending</button>
+                  <button type="button" class="status-choice" data-status="Paid" aria-pressed="false">Paid</button>
+                  <button type="button" class="status-choice" data-status="Refunded" aria-pressed="false">Refunded</button>
+                </div>
+              </td>
             </tr>
             <tr>
-              <input type="checkbox" id="m-cb-k884" class="gs-hidden-toggle mgmt-toggle-cb">
               <td><strong>#K-884</strong></td>
               <td>Zone FAM-A (06:30 PM)</td>
               <td>2x Hijayu Siakap Green Curry (RM 122), 2x Hijayu Chicken Wings (RM 40), 4x Hijayu Pandan Mix Fruit (RM 62)</td>
               <td>RM 224.00</td>
               <td>
-                <span class="status-badge status-preparing state-default">Preparing in Kitchen</span>
-                <span class="status-badge status-available state-toggled">Ready to Serve &check;</span>
+                <div class="status-choice-group" role="group" aria-label="Kitchen status for ticket K-884">
+                  <button type="button" class="status-choice" data-status="Preparing" aria-pressed="true">Preparing</button>
+                  <button type="button" class="status-choice" data-status="Ready to Serve" aria-pressed="false">Ready</button>
+                  <button type="button" class="status-choice" data-status="Served" aria-pressed="false">Served</button>
+                </div>
               </td>
-              <td><label for="m-cb-k884" class="btn btn-outline">Advance Ticket</label></td>
+              <td>
+                <div class="status-choice-group" role="group" aria-label="Payment status for ticket K-884">
+                  <button type="button" class="status-choice" data-status="Pending" aria-pressed="true">Pending</button>
+                  <button type="button" class="status-choice" data-status="Paid" aria-pressed="false">Paid</button>
+                  <button type="button" class="status-choice" data-status="Refunded" aria-pressed="false">Refunded</button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -2308,19 +2470,16 @@ label.btn {
       <section class="page-banner">
         <div>
           <h1>Hijayu Caf&eacute; Contact Support, Location &amp; External Links</h1>
-          <p>Connect with Hijayu Caf&eacute; via direct email hyperlink or explore our verified delivery listings and web design benchmarks.</p>
+          <p>Contact Hijayu Caf&eacute; by phone or explore our delivery listings and web design benchmarks.</p>
         </div>
-        <a href="mailto:reservations@hijayucafe.my?subject=Hijayu%20Cafe%20Table%20Reservation" class="btn btn-primary">Email Reservation Desk</a>
       </section>
 
       <section class="grid-3">
         <article class="card">
-          <span class="card-tag">Direct E-Mail &amp; Phone</span>
+          <span class="card-tag">Phone &amp; WhatsApp</span>
           <h3>Reservation &amp; Catering Desk</h3>
-          <p>Need to book a family table for <em>Hijayu Siakap Green Curry</em> or modify a pre-order? Click our direct e-mail hyperlink or call us:</p>
-          <p>Email: <a href="mailto:reservations@hijayucafe.my?subject=Hijayu%20Cafe%20Inquiry">reservations@hijayucafe.my</a></p>
+          <p>Need to book a family table for <em>Hijayu Siakap Green Curry</em> or modify a pre-order? Call or message our team:</p>
           <p>Phone / WhatsApp: <strong>+60 19-925 7053</strong></p>
-          <p>Student Developer Desk: <a href="mailto:s79559@ocean.umt.edu.my">s79559@ocean.umt.edu.my</a></p>
         </article>
 
         <article class="card">
@@ -2409,7 +2568,7 @@ label.btn {
       <div class="footer-col">
         <h3>Contact &amp; Project Team</h3>
         <p>Lot 16716, Kg. Sepetir Rendang, 21300 Kuala Terengganu / Kuala Nerus, Terengganu</p>
-        <p>Email: <a href="mailto:reservations@hijayucafe.my">reservations@hijayucafe.my</a> | Tel: +60 19-925 7053</p>
+        <p>Tel / WhatsApp: +60 19-925 7053</p>
         <p>CSF3133 Group K3: Amirul Adli (S79559), Muhammad Irfan (S79175), Nur Sorfina (S79104)</p>
       </div>
     </div>
