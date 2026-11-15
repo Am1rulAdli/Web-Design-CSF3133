@@ -2,11 +2,15 @@
 
 Browse the customer menu, build a pre-order, and reserve a table. The checkout is a visual assignment demo only; **no real payments are collected**.
 
-## Visit the website
+## Choose a website
 
-### [Open the Hijayu Cafe customer website](https://am1ruladli.github.io/Web-Design-CSF3133/)
+### [Customer website — menu & table booking](https://am1ruladli.github.io/Web-Design-CSF3133/)
 
-Browse the menu, adjust cart quantities, add notes to each item, and reserve a table. Confirming a reservation opens the demo card or e-wallet checkout.
+Browse the menu, adjust cart quantities, add notes to items, and reserve a table. Confirming a reservation opens the demo card or e-wallet checkout.
+
+### [Employee website — management portal](https://am1ruladli.github.io/Web-Design-CSF3133/webdesign.html)
+
+View the full project, including the staff management portal for table statuses, kitchen orders, and the sales ledger.
 
 ## Project files
 
