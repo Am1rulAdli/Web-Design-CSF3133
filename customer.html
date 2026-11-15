@@ -1,0 +1,2359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hijayu Caf&eacute; | Customer Menu, Reservation &amp; Pre-Order</title>
+  <script>
+
+window.switchPage = function (targetId) {
+  var r = document.getElementById("gs-tab-" + targetId);
+  if (r) r.checked = true;
+  try { window.scrollTo(0, 0); } catch (e) {}
+};
+
+var cartQuantities = Object.create(null);
+var cartTouchedItems = Object.create(null);
+var cartToastTimer;
+
+window.getCartProducts = function () {
+  var controls = document.querySelectorAll("#view-menu .cart-quantity-control");
+  var products = [];
+  for (var i = 0; i < controls.length; i++) {
+    products.push({
+      id: controls[i].getAttribute("data-cart-item"),
+      name: controls[i].getAttribute("data-item-name"),
+      price: parseFloat(controls[i].getAttribute("data-item-price") || "0")
+    });
+  }
+  return products;
+};
+
+window.getCartProduct = function (itemId) {
+  var products = window.getCartProducts();
+  for (var i = 0; i < products.length; i++) {
+    if (products[i].id === itemId) return products[i];
+  }
+  return null;
+};
+
+window.getCartTotal = function () {
+  var products = window.getCartProducts();
+  var total = 0;
+  for (var i = 0; i < products.length; i++) {
+    total += (cartQuantities[products[i].id] || 0) * products[i].price;
+  }
+  return total;
+};
+
+window.changeCartQuantity = function (itemId, change) {
+  var product = window.getCartProduct(itemId);
+  if (!product || (change !== 1 && change !== -1)) return;
+  var quantity = Math.max(0, (cartQuantities[itemId] || 0) + change);
+  cartQuantities[itemId] = quantity;
+  cartTouchedItems[itemId] = true;
+  window.renderCart();
+  if (change > 0) window.showCartToast(product, quantity);
+};
+
+window.showCartToast = function (product, quantity) {
+  var toast = document.getElementById("cart-toast");
+  if (!toast) return;
+  toast.textContent = product.name + " (" + quantity + ") added to cart.";
+  toast.classList.add("visible");
+  if (cartToastTimer) window.clearTimeout(cartToastTimer);
+  cartToastTimer = window.setTimeout(function () {
+    toast.classList.remove("visible");
+  }, 2400);
+};
+
+window.renderCart = function () {
+  var products = window.getCartProducts();
+  var itemCount = 0;
+  var total = window.getCartTotal();
+  var summaryItems = [];
+  var cartList = document.getElementById("cart-items-list");
+  var countEl = document.getElementById("cart-count");
+  var cartTotalEl = document.getElementById("cart-total");
+  var preorderCountEl = document.getElementById("preorder-count");
+  var preorderTotalEl = document.getElementById("preorder-total");
+  var preorderListEl = document.getElementById("preorder-items-list");
+  var menuControls = document.querySelectorAll(".cart-quantity-control");
+
+  for (var i = 0; i < products.length; i++) {
+    var quantity = cartQuantities[products[i].id] || 0;
+    itemCount += quantity;
+    if (quantity > 0) summaryItems.push(products[i].name + " (" + quantity + ")");
+  }
+
+  for (var j = 0; j < menuControls.length; j++) {
+    var control = menuControls[j];
+    var id = control.getAttribute("data-cart-item");
+    var quantityEl = control.querySelector(".cart-quantity");
+    var minusButton = control.querySelector(".cart-minus");
+    var addLabel = control.querySelector(".cart-add-label");
+    var plusLabel = control.querySelector(".cart-plus-one");
+    var currentQuantity = cartQuantities[id] || 0;
+    if (quantityEl) quantityEl.textContent = String(currentQuantity);
+    if (minusButton) minusButton.classList.toggle("hidden-item", currentQuantity === 0);
+    if (addLabel) addLabel.classList.toggle("hidden-item", currentQuantity > 0);
+    if (plusLabel) plusLabel.classList.toggle("hidden-item", currentQuantity === 0);
+  }
+
+  if (countEl) countEl.textContent = String(itemCount);
+  if (cartTotalEl) cartTotalEl.textContent = "RM " + total.toFixed(2);
+  if (preorderCountEl) preorderCountEl.textContent = String(itemCount);
+  if (preorderTotalEl) preorderTotalEl.textContent = "RM " + total.toFixed(2);
+  if (preorderListEl) {
+    preorderListEl.textContent = summaryItems.length
+      ? "Selected: " + summaryItems.join(", ") + " — Total: RM " + total.toFixed(2)
+      : "No items selected yet. Add items from the menu or your reservation form.";
+  }
+
+  if (cartList) {
+    while (cartList.firstChild) cartList.removeChild(cartList.firstChild);
+    var hasItems = false;
+    for (var k = 0; k < products.length; k++) {
+      var item = products[k];
+      if (!cartTouchedItems[item.id]) continue;
+      hasItems = true;
+      var row = document.createElement("li");
+      row.className = "cart-item-row";
+      var name = document.createElement("span");
+      name.className = "cart-item-name";
+      name.textContent = item.name + " (" + (cartQuantities[item.id] || 0) + ")";
+      var actions = document.createElement("span");
+      actions.className = "cart-item-actions";
+      if (cartQuantities[item.id] > 0) {
+        var minus = document.createElement("button");
+        minus.type = "button";
+        minus.className = "cart-step-button";
+        minus.textContent = "−1";
+        minus.setAttribute("aria-label", "Remove one " + item.name);
+        minus.onclick = (function (id) {
+          return function () { window.changeCartQuantity(id, -1); };
+        })(item.id);
+        actions.appendChild(minus);
+      }
+      var plus = document.createElement("button");
+      plus.type = "button";
+      plus.className = "cart-step-button";
+      plus.textContent = "+1";
+      plus.setAttribute("aria-label", "Add one " + item.name);
+      plus.onclick = (function (id) {
+        return function () { window.changeCartQuantity(id, 1); };
+      })(item.id);
+      actions.appendChild(plus);
+      row.appendChild(name);
+      row.appendChild(actions);
+      cartList.appendChild(row);
+    }
+    if (!hasItems) {
+      var empty = document.createElement("li");
+      empty.className = "cart-empty";
+      empty.textContent = "Your cart is empty.";
+      cartList.appendChild(empty);
+    }
+  }
+
+  var reservationTotal = document.getElementById("est-food-total");
+  if (reservationTotal) reservationTotal.textContent = "RM " + total.toFixed(2);
+  window.updateReservationEstimate();
+};
+
+window.toggleCart = function () {
+  var widget = document.getElementById("cart-widget");
+  var button = document.getElementById("cart-toggle");
+  if (!widget || !button) return;
+  var isOpen = widget.classList.contains("open");
+  widget.classList.remove("closed");
+  if (isOpen) {
+    widget.classList.remove("open");
+    widget.classList.add("closed");
+    isOpen = false;
+  } else {
+    widget.classList.add("open");
+    isOpen = true;
+  }
+  button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+};
+
+window.closeCart = function () {
+  var widget = document.getElementById("cart-widget");
+  var button = document.getElementById("cart-toggle");
+  if (widget) {
+    widget.classList.remove("open");
+    widget.classList.add("closed");
+  }
+  if (button) button.setAttribute("aria-expanded", "false");
+};
+
+window.recalcMenuPreOrder = function () {
+  window.renderCart();
+};
+
+window.resetMenuPreOrder = function () {
+  cartQuantities = Object.create(null);
+  cartTouchedItems = Object.create(null);
+  var noteFields = document.querySelectorAll(".preorder-note");
+  for (var i = 0; i < noteFields.length; i++) noteFields[i].value = "";
+  if (cartToastTimer) window.clearTimeout(cartToastTimer);
+  cartToastTimer = null;
+  var toast = document.getElementById("cart-toast");
+  if (toast) toast.classList.remove("visible");
+  window.renderCart();
+};
+
+window.updateReservationEstimate = function () {
+  var zoneRadios = document.querySelectorAll("input[name='seating_zone']");
+  var estZoneEl = document.getElementById("est-zone-fee");
+  var estFoodEl = document.getElementById("est-food-total");
+  var estGrandEl = document.getElementById("est-grand-total");
+
+  var zoneFee = 0;
+  for (var i = 0; i < zoneRadios.length; i++) {
+    if (zoneRadios[i].checked) zoneFee = parseFloat(zoneRadios[i].getAttribute("data-zone-fee") || "0");
+  }
+  var foodTotal = window.getCartTotal();
+  var grand = zoneFee + foodTotal;
+  if (estZoneEl) estZoneEl.textContent = "RM " + zoneFee.toFixed(2);
+  if (estFoodEl) estFoodEl.textContent = "RM " + foodTotal.toFixed(2);
+  if (estGrandEl) estGrandEl.textContent = "RM " + grand.toFixed(2);
+};
+
+window.handleZoneFilter = function (sel) {
+  var val = sel.value;
+  var rows = document.querySelectorAll("#zones-schedule-table tbody tr");
+  for (var i = 0; i < rows.length; i++) {
+    var z = rows[i].getAttribute("data-zone-type");
+    if (val === "all" || z === val) {
+      rows[i].classList.remove("hidden-item");
+    } else {
+      rows[i].classList.add("hidden-item");
+    }
+  }
+};
+
+window.handleReservationSubmit = function (e) {
+  if (e && e.preventDefault) e.preventDefault();
+  window.updateReservationEstimate();
+  var nameEl = document.getElementById("res-name");
+  var dateEl = document.getElementById("res-date");
+  var timeEl = document.getElementById("res-time");
+  var guestsEl = document.getElementById("res-guests");
+  var estGrandEl = document.getElementById("est-grand-total");
+
+  var nameVal = (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : "Valued Guest";
+  var dateVal = dateEl ? dateEl.value : "2026-11-15";
+  var timeVal = timeEl ? timeEl.value : "12:30 PM";
+  var guestsVal = guestsEl ? guestsEl.value : "2";
+  var totalText = estGrandEl ? estGrandEl.textContent : "RM 0.00";
+  var products = window.getCartProducts();
+
+  var zoneEl = document.querySelector("input[name='seating_zone']:checked");
+  var emailEl = document.getElementById("res-email");
+  var phoneEl = document.getElementById("res-phone");
+  var notesEl = document.getElementById("res-notes");
+  var checkoutData = {
+    reference: "HJ-" + Date.now(),
+    name: nameVal,
+    email: emailEl ? emailEl.value.trim() : "",
+    phone: phoneEl ? phoneEl.value.trim() : "",
+    date: dateVal,
+    time: timeVal,
+    guests: guestsVal,
+    zone: zoneEl ? zoneEl.value : "",
+    zoneFee: zoneEl ? parseFloat(zoneEl.getAttribute("data-zone-fee") || "0") : 0,
+    tableNotes: notesEl ? notesEl.value.trim() : "",
+    items: [],
+    total: parseFloat(totalText.replace(/[^\d.]/g, "")) || 0
+  };
+  for (var j = 0; j < products.length; j++) {
+    var itemQuantity = cartQuantities[products[j].id] || 0;
+    if (itemQuantity > 0) {
+      var itemNoteField = document.getElementById("preorder-note-" + products[j].id);
+      checkoutData.items.push({
+        name: products[j].name,
+        quantity: itemQuantity,
+        price: products[j].price,
+        note: itemNoteField ? itemNoteField.value.trim() : ""
+      });
+    }
+  }
+  window.sessionStorage.setItem("hijayuDemoCheckout", JSON.stringify(checkoutData));
+  window.location.href = "payment.html";
+  return false;
+};
+
+window.handleReservationReset = function () {
+  setTimeout(function () {
+    window.resetMenuPreOrder();
+    window.updateReservationEstimate();
+  }, 50);
+};
+
+document.addEventListener("DOMContentLoaded", function () {
+  window.renderCart();
+});
+
+  </script>
+  <style>
+/* ==========================================================================
+   Hijayu Cafe - External Style Sheet (styles.css)
+   Course: CSF3133 Web-Based User Interface Design (UMT)
+   Project: Cafe Table Reservation and Food Ordering System
+   Authors: Amirul Adli (S79559), Muhammad Irfan (S79175), Nur Sorfina (S79104)
+   Compliance: 100% External CSS (Zero inline styles, zero embedded <style> tags)
+   ========================================================================== */
+
+:root {
+  --espresso-dark: #143320;
+  --espresso-mid: #1E4D2B;
+  --caramel-gold: #C87D32;
+  --caramel-light: #E6A15C;
+  --cream-bg: #FAF6F0;
+  --cream-card: #FFFFFF;
+  --sage-accent: #2E6F40;
+  --danger-red: #B91C1C;
+  --amber-warn: #B45309;
+  --info-blue: #1D4ED8;
+  --text-primary: #1F1612;
+  --text-secondary: #5C493E;
+  --border-soft: #E5D9CC;
+  --shadow-sm: 0 2px 8px rgba(44, 24, 16, 0.08);
+  --shadow-md: 0 8px 24px rgba(44, 24, 16, 0.14);
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--cream-bg);
+  color: var(--text-primary);
+  line-height: 1.6;
+  font-size: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Consistent Top Announcement Bar */
+.top-utility-bar {
+  background-color: var(--espresso-dark);
+  color: #F5EBE1;
+  font-size: 0.85rem;
+  padding: 8px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  border-bottom: 1px solid rgba(230, 161, 92, 0.25);
+}
+
+.top-utility-bar a {
+  color: var(--caramel-light);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.25s ease;
+}
+
+.top-utility-bar a:hover {
+  color: #FFFFFF;
+  text-decoration: underline;
+}
+
+/* Consistent Banner Logo Area & Header */
+.site-header {
+  background: linear-gradient(135deg, var(--espresso-dark) 0%, var(--espresso-mid) 100%);
+  color: #FFFFFF;
+  box-shadow: var(--shadow-md);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.header-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-decoration: none;
+  color: #FFFFFF;
+}
+
+.logo-emblem {
+  width: 48px;
+  height: 48px;
+  background-color: var(--caramel-gold);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(200, 125, 50, 0.4);
+  transition: transform 0.3s ease, background-color 0.3s ease;
+}
+
+.logo-area:hover .logo-emblem {
+  transform: rotate(-6deg) scale(1.06);
+  background-color: var(--caramel-light);
+}
+
+.logo-text-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-name {
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: #FFFFFF;
+  line-height: 1.15;
+}
+
+.brand-tagline {
+  font-size: 0.78rem;
+  color: var(--caramel-light);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+/* Consistent Main Navigation */
+.main-nav ul {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.main-nav a {
+  display: inline-block;
+  padding: 8px 14px;
+  color: #F3E9DF;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.92rem;
+  border-radius: 8px;
+  transition: background-color 0.25s ease, color 0.25s ease, transform 0.2s ease;
+}
+
+.main-nav a:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: var(--caramel-light);
+  transform: translateY(-1px);
+}
+
+.main-nav a.active {
+  background-color: var(--caramel-gold);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(200, 125, 50, 0.45);
+}
+
+.nav-cta-btn {
+  background-color: var(--sage-accent);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Main Content Wrapper */
+.main-wrapper {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+/* Hero Banner Section */
+.hero-banner {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 32px;
+  align-items: center;
+  background: linear-gradient(125deg, #143320 0%, #1E4D2B 100%);
+  color: #FFFFFF;
+  border-radius: var(--radius-lg);
+  padding: 42px;
+  margin-bottom: 36px;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.hero-badge {
+  display: inline-block;
+  background-color: rgba(200, 125, 50, 0.25);
+  color: var(--caramel-light);
+  border: 1px solid var(--caramel-gold);
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 14px;
+}
+
+.hero-content h1 {
+  font-size: 2.35rem;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: #FFFFFF;
+}
+
+.hero-content p {
+  font-size: 1.05rem;
+  color: #E8DCD0;
+  margin-bottom: 24px;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.hero-media img {
+  width: 100%;
+  height: 320px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 3px solid rgba(230, 161, 92, 0.45);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  transition: transform 0.4s ease;
+}
+
+.hero-media img:hover {
+  transform: scale(1.02);
+}
+
+/* Buttons */
+.btn {
+  display: inline-block;
+  padding: 11px 22px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
+}
+
+.btn-primary {
+  background-color: var(--caramel-gold);
+  color: #FFFFFF;
+}
+
+.btn-primary:hover {
+  background-color: #B06922;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(200, 125, 50, 0.4);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: #FFFFFF;
+  border: 2px solid var(--caramel-light);
+}
+
+.btn-secondary:hover {
+  background-color: rgba(230, 161, 92, 0.15);
+  transform: translateY(-2px);
+}
+
+.btn-dark {
+  background-color: var(--espresso-mid);
+  color: #FFFFFF;
+}
+
+.btn-dark:hover {
+  background-color: var(--espresso-dark);
+}
+
+.btn-outline {
+  background-color: #FFFFFF;
+  color: var(--espresso-mid);
+  border: 1.5px solid var(--border-soft);
+}
+
+.btn-outline:hover,
+.btn-outline.active-filter {
+  background-color: var(--espresso-mid);
+  color: #FFFFFF;
+  border-color: var(--espresso-mid);
+}
+
+/* Page Intro Header for Subpages */
+.page-banner {
+  background: linear-gradient(120deg, var(--espresso-dark) 0%, var(--espresso-mid) 100%);
+  color: #FFFFFF;
+  padding: 30px 36px;
+  border-radius: var(--radius-lg);
+  margin-bottom: 30px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.page-banner h1 {
+  font-size: 1.85rem;
+  margin-bottom: 6px;
+}
+
+.page-banner p {
+  color: #E2D5C8;
+  font-size: 0.98rem;
+}
+
+/* Section Headings */
+.section-header {
+  margin-bottom: 22px;
+}
+
+.section-header h2 {
+  font-size: 1.55rem;
+  color: var(--espresso-dark);
+  border-left: 5px solid var(--caramel-gold);
+  padding-left: 12px;
+  margin-bottom: 6px;
+}
+
+.section-header p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+/* Grid Layouts & Cards (with CSS Transitions Bonus Feature) */
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 28px;
+  margin-bottom: 32px;
+}
+
+.card {
+  background-color: var(--cream-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--caramel-gold);
+}
+
+.card-tag {
+  display: inline-block;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background-color: #F4E8DA;
+  color: var(--espresso-mid);
+  margin-bottom: 10px;
+}
+
+.card h3 {
+  font-size: 1.2rem;
+  color: var(--espresso-dark);
+  margin-bottom: 8px;
+}
+
+.card p {
+  color: var(--text-secondary);
+  font-size: 0.93rem;
+  margin-bottom: 14px;
+}
+
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-soft);
+}
+
+.price-tag {
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: var(--caramel-gold);
+}
+
+/* Metric KPI Cards */
+.kpi-card {
+  background-color: var(--cream-card);
+  border: 1px solid var(--border-soft);
+  border-top: 4px solid var(--caramel-gold);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.kpi-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--espresso-dark);
+}
+
+.kpi-sub {
+  font-size: 0.82rem;
+  color: var(--sage-accent);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* Filter Bar & Interactive Bar */
+.filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background-color: var(--cream-card);
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-soft);
+  margin-bottom: 24px;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Data Tables (PLO2 Table Requirement) */
+.table-container {
+  background-color: var(--cream-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 32px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.data-table caption {
+  text-align: left;
+  padding: 16px 20px;
+  font-weight: 700;
+  font-size: 1.08rem;
+  color: var(--espresso-dark);
+  background-color: #F7EFE6;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.data-table th {
+  background-color: var(--espresso-mid);
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 13px 16px;
+  border-bottom: 2px solid var(--caramel-gold);
+}
+
+.data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 0.92rem;
+  color: var(--text-primary);
+}
+
+.data-table tbody tr:nth-child(even) {
+  background-color: #FCF9F5;
+}
+
+.data-table tbody tr:hover {
+  background-color: #F4E9DC;
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.status-available {
+  background-color: #DCFCE7;
+  color: #166534;
+}
+
+.status-reserved {
+  background-color: #FEF3C7;
+  color: #92400E;
+}
+
+.status-occupied {
+  background-color: #FEE2E2;
+  color: #991B1B;
+}
+
+.status-preparing {
+  background-color: #DBEAFE;
+  color: #1E40AF;
+}
+
+/* Forms (PLO2 Form Requirement - 3+ Elements) */
+.form-card {
+  background-color: var(--cream-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 28px;
+  box-shadow: var(--shadow-sm);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--espresso-dark);
+}
+
+.form-control {
+  padding: 10px 14px;
+  border: 1.5px solid var(--border-soft);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background-color: #FFFFFF;
+  color: var(--text-primary);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--caramel-gold);
+  box-shadow: 0 0 0 3px rgba(200, 125, 50, 0.2);
+}
+
+.option-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 10px 14px;
+  background-color: #FCF9F5;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+
+.option-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.reservation-preorder-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.reservation-preorder-item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.preorder-note-label {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.preorder-note {
+  min-height: 54px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.preorder-note:focus {
+  outline: none;
+  border-color: var(--caramel-gold);
+  box-shadow: 0 0 0 3px rgba(200, 125, 50, 0.15);
+}
+
+.status-choice-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 190px;
+}
+
+.status-choice {
+  padding: 6px 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background-color: #FFFFFF;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.status-choice:hover {
+  border-color: var(--espresso-mid);
+}
+
+.status-choice[aria-pressed="true"] {
+  border-color: var(--espresso-mid);
+  background-color: var(--espresso-mid);
+  color: #FFFFFF;
+  box-shadow: var(--shadow-sm);
+}
+
+.status-choice[data-status="Available"][aria-pressed="true"],
+.status-choice[data-status="Ready to Serve"][aria-pressed="true"],
+.status-choice[data-status="Served"][aria-pressed="true"],
+.status-choice[data-status="Paid"][aria-pressed="true"] {
+  border-color: #166534;
+  background-color: #166534;
+}
+
+.status-choice[data-status="Reserved"][aria-pressed="true"],
+.status-choice[data-status="Preparing"][aria-pressed="true"],
+.status-choice[data-status="Pending"][aria-pressed="true"] {
+  border-color: #92400E;
+  background-color: #92400E;
+}
+
+.status-choice[data-status="Occupied"][aria-pressed="true"],
+.status-choice[data-status="Refunded"][aria-pressed="true"] {
+  border-color: #991B1B;
+  background-color: #991B1B;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+/* CSS Image Gallery & CSS Transition Bonus Feature */
+.css-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 22px;
+  margin-bottom: 34px;
+}
+
+.gallery-item {
+  background-color: var(--cream-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+
+.gallery-item:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: var(--shadow-md);
+}
+
+.gallery-thumb-wrapper {
+  overflow: hidden;
+  height: 200px;
+  position: relative;
+}
+
+.gallery-thumb-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease, filter 0.4s ease;
+}
+
+.gallery-item:hover .gallery-thumb-wrapper img {
+  transform: scale(1.08);
+  filter: brightness(1.05);
+}
+
+.gallery-caption {
+  padding: 16px 18px;
+}
+
+.gallery-caption h3 {
+  font-size: 1.08rem;
+  color: var(--espresso-dark);
+  margin-bottom: 6px;
+}
+
+.gallery-caption p {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+/* Video Embed Container (Bonus Feature) */
+.video-showcase-box {
+  background-color: var(--cream-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 32px;
+}
+
+.video-frame-wrapper {
+  position: relative;
+  width: 100%;
+  padding-bottom: 45%;
+  height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border-soft);
+  background-color: #1F1612;
+}
+
+.video-frame-wrapper iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* Alert / Confirmation Box */
+.feedback-banner {
+  padding: 16px 20px;
+  border-radius: 8px;
+  background-color: #DCFCE7;
+  color: #166534;
+  border: 1px solid #86EFAC;
+  font-weight: 600;
+  margin-top: 16px;
+  display: none;
+}
+
+.feedback-banner.visible {
+  display: block;
+}
+
+.summary-box {
+  background-color: #F7EFE6;
+  border: 1.5px solid var(--caramel-gold);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.summary-box h3 {
+  color: var(--espresso-dark);
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+}
+
+.summary-list {
+  list-style: none;
+}
+
+.summary-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border-soft);
+  font-size: 0.92rem;
+}
+
+.summary-total {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--espresso-dark);
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Consistent Footer */
+.site-footer {
+  background-color: var(--espresso-dark);
+  color: #E2D5C8;
+  padding: 40px 24px 24px;
+  margin-top: auto;
+  border-top: 4px solid var(--caramel-gold);
+}
+
+.footer-grid {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 28px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.footer-col h3 {
+  color: #FFFFFF;
+  font-size: 1.05rem;
+  margin-bottom: 12px;
+}
+
+.footer-col p,
+.footer-col li {
+  font-size: 0.88rem;
+  color: #D0C0B0;
+  margin-bottom: 8px;
+}
+
+.footer-col ul {
+  list-style: none;
+}
+
+.footer-col a {
+  color: var(--caramel-light);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.footer-col a:hover {
+  color: #FFFFFF;
+  text-decoration: underline;
+}
+
+.footer-bottom {
+  max-width: 1200px;
+  margin: 18px auto 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.82rem;
+  color: #B5A290;
+}
+
+.hidden-item {
+  display: none;
+}
+
+.cart-widget {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  font-size: 0.95rem;
+}
+
+.cart-toggle {
+  padding: 11px 16px;
+  border: 1px solid var(--caramel-light);
+  border-radius: 999px;
+  background-color: var(--espresso-dark);
+  color: #FFFFFF;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+}
+
+.cart-count {
+  display: inline-flex;
+  min-width: 24px;
+  height: 24px;
+  justify-content: center;
+  align-items: center;
+  margin-left: 5px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background-color: var(--caramel-gold);
+  color: #FFFFFF;
+}
+
+.cart-popover {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  width: min(390px, calc(100vw - 24px));
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background-color: #FFFFFF;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.cart-widget:hover:not(.closed) .cart-popover,
+.cart-widget.open .cart-popover {
+  display: block;
+}
+
+.cart-popover-heading,
+.cart-item-row,
+.cart-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.cart-popover-heading {
+  margin-bottom: 10px;
+}
+
+.cart-popover-heading h2 {
+  color: var(--espresso-dark);
+  font-size: 1.05rem;
+}
+
+.cart-close {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cart-items-list {
+  list-style: none;
+}
+
+.cart-item-row {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.cart-item-name {
+  flex: 1;
+}
+
+.cart-item-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.cart-step-button {
+  min-width: 40px;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background-color: #FFFFFF;
+  color: var(--espresso-dark);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cart-step-button:hover {
+  background-color: #F4E9DC;
+}
+
+.cart-plus.btn {
+  min-height: 38px;
+  padding: 7px 12px;
+  white-space: nowrap;
+}
+
+.cart-total {
+  justify-content: flex-end;
+  padding-top: 12px;
+  color: var(--espresso-dark);
+}
+
+.cart-empty {
+  padding: 10px 0;
+  color: var(--text-secondary);
+}
+
+.cart-toast {
+  position: fixed;
+  bottom: 86px;
+  right: 24px;
+  z-index: 1001;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 11px 16px;
+  border-radius: 8px;
+  background-color: var(--espresso-dark);
+  color: #FFFFFF;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.cart-toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.cart-quantity-control {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.cart-quantity {
+  min-width: 20px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.reservation-cart-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  background-color: #FCF9F5;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+
+.reservation-cart-item {
+  min-height: 42px;
+}
+
+.reservation-cart-name {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 600px) {
+  .cart-widget {
+    bottom: 12px;
+    right: 10px;
+  }
+  .cart-popover {
+    width: calc(100vw - 20px);
+  }
+  .cart-toast {
+    bottom: 72px;
+    right: 10px;
+  }
+  .reservation-cart-name {
+    font-size: 0.78rem;
+  }
+  .reservation-cart-item {
+    gap: 4px;
+  }
+}
+
+/* Responsive Media Queries (Smartphone & Tablet Display) */
+@media (max-width: 860px) {
+  .hero-banner {
+    grid-template-columns: 1fr;
+    padding: 28px;
+  }
+  .header-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .video-frame-wrapper {
+    padding-bottom: 56.25%;
+  }
+}
+
+/* ==========================================================================
+   Google Sites Unbreakable Dual-Engine (Pure CSS :checked + JS) Rules
+   ========================================================================== */
+html {
+  scroll-behavior: auto;
+}
+.gs-hidden-toggle {
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+}
+
+.main-nav label.nav-link-btn,
+.logo-area-label,
+.footer-link-label,
+label.btn {
+  cursor: pointer !important;
+  user-select: none;
+}
+
+.main-nav label.nav-link-btn {
+  display: inline-block;
+  padding: 8px 14px;
+  color: #F3E9DF;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.92rem;
+  border-radius: 8px;
+  transition: background-color 0.25s ease, color 0.25s ease, transform 0.2s ease;
+}
+.main-nav label.nav-link-btn:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: var(--caramel-light);
+  transform: translateY(-1px);
+}
+.footer-link-label {
+  color: var(--caramel-light);
+  font-size: 0.88rem;
+  display: inline-block;
+}
+.footer-link-label:hover {
+  color: #FFFFFF;
+  text-decoration: underline;
+}
+
+/* 1. Pure-CSS 6-Page Switching */
+.spa-page-view {
+  display: none;
+}
+#gs-tab-index:checked ~ .main-wrapper #view-index,
+#gs-tab-menu:checked ~ .main-wrapper #view-menu,
+#gs-tab-reservation:checked ~ .main-wrapper #view-reservation,
+#gs-tab-availability:checked ~ .main-wrapper #view-availability,
+#gs-tab-gallery:checked ~ .main-wrapper #view-gallery,
+#gs-tab-contact:checked ~ .main-wrapper #view-contact {
+  display: block;
+}
+
+/* 2. Pure-CSS Active Navigation Tab Highlighting */
+#gs-tab-index:checked ~ .site-header label[for="gs-tab-index"].nav-link-btn,
+#gs-tab-menu:checked ~ .site-header label[for="gs-tab-menu"].nav-link-btn,
+#gs-tab-reservation:checked ~ .site-header label[for="gs-tab-reservation"].nav-link-btn,
+#gs-tab-availability:checked ~ .site-header label[for="gs-tab-availability"].nav-link-btn,
+#gs-tab-gallery:checked ~ .site-header label[for="gs-tab-gallery"].nav-link-btn,
+#gs-tab-contact:checked ~ .site-header label[for="gs-tab-contact"].nav-link-btn {
+  background-color: var(--caramel-gold);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(200, 125, 50, 0.45);
+}
+
+/* 3. Pure-CSS Menu Category Filtering */
+#mf-all:checked ~ .filter-bar label[for="mf-all"],
+#mf-mains:checked ~ .filter-bar label[for="mf-mains"],
+#mf-platters:checked ~ .filter-bar label[for="mf-platters"],
+#mf-drinks:checked ~ .filter-bar label[for="mf-drinks"] {
+  background-color: var(--espresso-mid);
+  color: #FFFFFF;
+  border-color: var(--espresso-mid);
+}
+#mf-mains:checked ~ .menu-cards-grid [data-menu-category]:not([data-menu-category="mains"]),
+#mf-platters:checked ~ .menu-cards-grid [data-menu-category]:not([data-menu-category="platters"]),
+#mf-drinks:checked ~ .menu-cards-grid [data-menu-category]:not([data-menu-category="drinks"]) {
+  display: none;
+}
+
+/* 5. Pure-CSS Gallery Category Filtering */
+#gf-all:checked ~ .page-banner label[for="gf-all"],
+#gf-interior:checked ~ .page-banner label[for="gf-interior"],
+#gf-cuisine:checked ~ .page-banner label[for="gf-cuisine"] {
+  background-color: var(--caramel-gold);
+  color: #FFFFFF;
+  border-color: var(--caramel-gold);
+}
+#gf-interior:checked ~ .css-gallery-grid [data-gallery-cat]:not([data-gallery-cat="interior"]),
+#gf-cuisine:checked ~ .css-gallery-grid [data-gallery-cat]:not([data-gallery-cat="cuisine"]) {
+  display: none;
+}
+
+  </style>
+</head>
+<body>
+  <input type="radio" name="gs_page_tab" id="gs-tab-index" class="gs-hidden-toggle" checked>
+  <input type="radio" name="gs_page_tab" id="gs-tab-menu" class="gs-hidden-toggle">
+  <input type="radio" name="gs_page_tab" id="gs-tab-reservation" class="gs-hidden-toggle">
+  <input type="radio" name="gs_page_tab" id="gs-tab-availability" class="gs-hidden-toggle">
+  <input type="radio" name="gs_page_tab" id="gs-tab-gallery" class="gs-hidden-toggle">
+  <input type="radio" name="gs_page_tab" id="gs-tab-contact" class="gs-hidden-toggle">
+
+  <div class="top-utility-bar">
+    <span>Open Mon&ndash;Thu, Sat&ndash;Sun: 12:30 PM &ndash; 10:30 PM (Closed Friday) | Lot 16716, Kg. Sepetir Rendang, Kuala Nerus</span>
+    <span>Booking Desk Tel / WhatsApp: +60 19-925 7053</span>
+  </div>
+
+  <header class="site-header">
+    <div class="header-container">
+      <label for="gs-tab-index" class="logo-area logo-area-label" onclick="window.switchPage('index');">
+        <div class="logo-emblem">HC</div>
+        <div class="logo-text-group">
+          <span class="brand-name">Hijayu Caf&eacute;</span>
+          <span class="brand-tagline">Table Reservation &amp; Food Ordering System</span>
+        </div>
+      </label>
+      <nav class="main-nav" aria-label="Primary Navigation">
+        <ul>
+          <li><label for="gs-tab-index" class="nav-link-btn" onclick="window.switchPage('index');">1. Home</label></li>
+          <li><label for="gs-tab-menu" class="nav-link-btn" onclick="window.switchPage('menu');">2. Menu &amp; Pre-Order</label></li>
+          <li><label for="gs-tab-reservation" class="nav-link-btn" onclick="window.switchPage('reservation');">3. Table Reservation</label></li>
+          <li><label for="gs-tab-availability" class="nav-link-btn" onclick="window.switchPage('availability');">4. Zones &amp; Schedule</label></li>
+          <li><label for="gs-tab-gallery" class="nav-link-btn" onclick="window.switchPage('gallery');">5. Gallery &amp; Tour</label></li>
+          <li><label for="gs-tab-contact" class="nav-link-btn" onclick="window.switchPage('contact');">6. Contact Us</label></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <aside id="cart-widget" class="cart-widget" aria-label="Shopping cart">
+    <button type="button" id="cart-toggle" class="cart-toggle" aria-expanded="false" aria-controls="cart-popover" onclick="window.toggleCart();">
+      <span aria-hidden="true">🛒</span> Cart <span id="cart-count" class="cart-count">0</span>
+    </button>
+    <div id="cart-popover" class="cart-popover">
+      <div class="cart-popover-heading">
+        <h2>Your Pre-Order</h2>
+        <button type="button" class="cart-close" aria-label="Close cart" onclick="window.closeCart();">&times;</button>
+      </div>
+      <ul id="cart-items-list" class="cart-items-list">
+        <li class="cart-empty">Your cart is empty.</li>
+      </ul>
+      <div class="cart-total">Total: <strong id="cart-total">RM 0.00</strong></div>
+    </div>
+  </aside>
+  <div id="cart-toast" class="cart-toast" role="status" aria-live="polite"></div>
+
+  <main class="main-wrapper">
+    <!-- ==================== VIEW 1: HOME PAGE (index.html) ==================== -->
+    <div id="view-index" class="spa-page-view">
+      <section class="hero-banner">
+        <div class="hero-content">
+          <span class="hero-badge">Kg. Sepetir Rendang &bull; Kuala Nerus</span>
+          <h1>Reserve Your Table &amp; Pre-Order Signature Dishes at Hijayu Caf&eacute;</h1>
+          <p>Skip peak-hour waiting lines at Hijayu Caf&eacute;. Choose your preferred indoor air-conditioned booth, quiet study table, or family dining zone, and pre-order our famous <strong>Hijayu Green Fried Rice</strong>, <strong>Hijayu Siakap Green Curry</strong>, and refreshing <strong>Hijayu Pandan Lemonade</strong> before you arrive.</p>
+          <div class="hero-actions">
+            <label for="gs-tab-reservation" class="btn btn-primary" onclick="window.switchPage('reservation');">Book a Table Now</label>
+            <label for="gs-tab-menu" class="btn btn-secondary" onclick="window.switchPage('menu');">Explore Hijayu Menu</label>
+          </div>
+        </div>
+        <div class="hero-media">
+          <img data-img-slot="spread" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Hijayu Cafe signature spread featuring Hijayu Green Fried Rice, Siakap Green Curry, Chicken Wings, Pandan Lemonade, and Strawberry Coffee">
+        </div>
+      </section>
+
+      <section class="grid-4" aria-label="Key Operational Highlights">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Dining Capacity</div>
+          <div class="kpi-value">24 Tables / 96 Seats</div>
+          <div class="kpi-sub">Indoor Hall, Study &amp; Family Zones</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Operating Schedule</div>
+          <div class="kpi-value">12:30 PM &ndash; 10:30 PM</div>
+          <div class="kpi-sub">Mon&ndash;Thu, Sat&ndash;Sun (Closed Fri)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Signature Menu Lineup</div>
+          <div class="kpi-value">7 House Specials</div>
+          <div class="kpi-sub">From RM 15.50 to RM 61.00</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Live Table Tracking</div>
+          <div class="kpi-value">Real-Time Sync</div>
+          <div class="kpi-sub">Zero double-booking guarantee</div>
+        </div>
+      </section>
+
+      <section class="section-header">
+        <h2>How Hijayu Caf&eacute;'s Reservation &amp; Pre-Order System Works</h2>
+        <p>Plan your visit, choose a table, and pre-order Hijayu Caf&eacute; signature dishes before you arrive.</p>
+      </section>
+
+      <section class="grid-3">
+        <article class="card">
+          <span class="card-tag">Step 01 &bull; Customer</span>
+          <h3>Select Dining Zone &amp; Time Slot</h3>
+          <p>Browse live table capacities across our Main Indoor Hall, Quiet Study &amp; Work Tables, Cozy Garden Terrace, and Family Group Tables to lock in your arrival window.</p>
+          <label for="gs-tab-availability" class="btn btn-outline" onclick="window.switchPage('availability');">View Table Zones &rarr;</label>
+        </article>
+        <article class="card">
+          <span class="card-tag">Step 02 &bull; Customer</span>
+          <h3>Pre-Order Signature Hijayu Dishes</h3>
+          <p>Attach dishes like <em>Hijayu Siakap Green Curry (RM 61.00)</em> or <em>Hijayu Green Fried Rice (RM 21.00)</em> directly to your booking so our kitchen begins cooking 15 minutes before check-in.</p>
+          <label for="gs-tab-menu" class="btn btn-outline" onclick="window.switchPage('menu');">Browse Digital Menu &rarr;</label>
+        </article>
+        <article class="card">
+          <span class="card-tag">Step 03 &bull; Customer</span>
+          <h3>Review &amp; Confirm Your Booking</h3>
+          <p>Check your table details and item notes, then continue to the demo checkout to view the available payment options.</p>
+          <label for="gs-tab-reservation" class="btn btn-outline" onclick="window.switchPage('reservation');">Review Booking &rarr;</label>
+        </article>
+      </section>
+    </div>
+
+    <!-- ==================== VIEW 2: DIGITAL MENU (menu.html) ==================== -->
+    <div id="view-menu" class="spa-page-view">
+      <input type="radio" name="css_menu_filter" id="mf-all" class="gs-hidden-toggle" checked>
+      <input type="radio" name="css_menu_filter" id="mf-mains" class="gs-hidden-toggle">
+      <input type="radio" name="css_menu_filter" id="mf-platters" class="gs-hidden-toggle">
+      <input type="radio" name="css_menu_filter" id="mf-drinks" class="gs-hidden-toggle">
+
+      <section class="page-banner">
+        <div>
+          <h1>Hijayu Caf&eacute; Digital Menu &amp; Pre-Order Catalog</h1>
+          <p>Filter our authentic Signature Hijayu dishes and specialty beverages, and select items to calculate your pre-order total.</p>
+        </div>
+        <label for="gs-tab-reservation" class="btn btn-primary" onclick="window.switchPage('reservation');">Proceed to Table Booking &rarr;</label>
+      </section>
+
+      <section class="filter-bar" aria-label="Menu Category Filter and Pre-Order Summary">
+        <div class="filter-buttons">
+          <label for="mf-all" class="btn btn-outline">All Signature Items (7)</label>
+          <label for="mf-mains" class="btn btn-outline">Signature Hijayu Mains</label>
+          <label for="mf-platters" class="btn btn-outline">Wings &amp; Sharing</label>
+          <label for="mf-drinks" class="btn btn-outline">Pandan &amp; Specialty Drinks</label>
+        </div>
+        <div>
+          <strong>Pre-Order Estimator:</strong> <span id="preorder-count">0</span> items | Total: <strong id="preorder-total">RM 0.00</strong>
+          <button type="button" id="clear-preorder-btn" class="btn btn-outline" onclick="window.resetMenuPreOrder();">Reset</button>
+        </div>
+      </section>
+
+      <p id="preorder-items-list" class="card">No items selected yet. Add items from the menu or your reservation form.</p>
+
+      <section class="grid-3 menu-cards-grid">
+        <article class="card" data-menu-category="mains">
+          <span class="card-tag">Signature Hijayu &bull; Best Seller</span>
+          <h3>Hijayu Green Fried Rice</h3>
+          <p>Fragrant green herb-infused fried rice (<em>Nasi Goreng Hijau Hijayu</em>) wok-tossed with fresh local greens, aromatic spices, and savoury toppings.</p>
+          <div class="price-row">
+            <span class="price-tag">RM 21.00</span>
+            <div class="cart-quantity-control" data-cart-item="green-fried-rice" data-item-name="Hijayu Green Fried Rice" data-item-price="21.00">
+              <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Green Fried Rice" onclick="window.changeCartQuantity('green-fried-rice', -1);">−1</button>
+              <span class="cart-quantity" aria-live="polite">0</span>
+              <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Green Fried Rice to pre-order" onclick="window.changeCartQuantity('green-fried-rice', 1);"><span class="cart-add-label">+ Add to Pre-Order</span><span class="cart-plus-one hidden-item">+1</span></button>
+            </div>
+          </div>
+        </article>
+
+        <article class="card" data-menu-category="mains">
+          <span class="card-tag">Signature Hijayu &bull; Family Dish</span>
+          <h3>Hijayu Siakap Green Curry</h3>
+          <p>Whole fresh barramundi (<em>Hijayu Siakap Kari Hijau</em>) simmered in a rich, aromatic Thai-Malay green curry with fresh sweet basil, herbs, and coconut milk.</p>
+          <div class="price-row">
+            <span class="price-tag">RM 61.00</span>
+            <div class="cart-quantity-control" data-cart-item="siakap-green-curry" data-item-name="Hijayu Siakap Green Curry" data-item-price="61.00">
+              <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Siakap Green Curry" onclick="window.changeCartQuantity('siakap-green-curry', -1);">−1</button>
+              <span class="cart-quantity" aria-live="polite">0</span>
+              <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Siakap Green Curry to pre-order" onclick="window.changeCartQuantity('siakap-green-curry', 1);"><span class="cart-add-label">+ Add to Pre-Order</span><span class="cart-plus-one hidden-item">+1</span></button>
+            </div>
+          </div>
+        </article>
+
+        <article class="card" data-menu-category="platters">
+          <span class="card-tag">Signature Hijayu &bull; Grilled</span>
+          <h3>Hijayu Chicken Wings</h3>
+          <p>Succulent chicken wings (<em>Sayap Ayam Hijayu</em>) marinated in Hijayu's secret blend of aromatic herbs and spices, grilled to golden, juicy perfection.</p>
+          <div class="price-row">
+            <span class="price-tag">RM 20.00</span>
+            <div class="cart-quantity-control" data-cart-item="chicken-wings" data-item-name="Hijayu Chicken Wings" data-item-price="20.00">
+              <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Chicken Wings" onclick="window.changeCartQuantity('chicken-wings', -1);">−1</button>
+              <span class="cart-quantity" aria-live="polite">0</span>
+              <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Chicken Wings to pre-order" onclick="window.changeCartQuantity('chicken-wings', 1);"><span class="cart-add-label">+ Add to Pre-Order</span><span class="cart-plus-one hidden-item">+1</span></button>
+            </div>
+          </div>
+        </article>
+
+        <article class="card" data-menu-category="platters">
+          <span class="card-tag">Signature Hijayu &bull; Sharing Combo</span>
+          <h3>Hijayu Best Friend</h3>
+          <p>Our beloved house combination platter (<em>Hijayu Sahabat Baik</em>) crafted with premium savoury bites that pair harmoniously for table sharing.</p>
+          <div class="price-row">
+            <span class="price-tag">RM 20.00</span>
+            <div class="cart-quantity-control" data-cart-item="best-friend" data-item-name="Hijayu Best Friend" data-item-price="20.00">
+              <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Best Friend" onclick="window.changeCartQuantity('best-friend', -1);">−1</button>
+              <span class="cart-quantity" aria-live="polite">0</span>
+              <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Best Friend to pre-order" onclick="window.changeCartQuantity('best-friend', 1);"><span class="cart-add-label">+ Add to Pre-Order</span><span class="cart-plus-one hidden-item">+1</span></button>
+            </div>
+          </div>
+        </article>
+
+        <article class="card" data-menu-category="drinks">
+          <span class="card-tag">Specialty Drink &bull; Refreshing</span>
+          <h3>Hijayu Pandan Lemonade</h3>
+          <p>Refreshing tropical cooler infused with aromatic natural pandan leaf essence and freshly squeezed lime juice, served ice-cold.</p>
+          <div class="price-row">
+            <span class="price-tag">RM 15.50</span>
+            <div class="cart-quantity-control" data-cart-item="pandan-lemonade" data-item-name="Hijayu Pandan Lemonade" data-item-price="15.50">
+              <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Pandan Lemonade" onclick="window.changeCartQuantity('pandan-lemonade', -1);">−1</button>
+              <span class="cart-quantity" aria-live="polite">0</span>
+              <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Pandan Lemonade to pre-order" onclick="window.changeCartQuantity('pandan-lemonade', 1);"><span class="cart-add-label">+ Add to Pre-Order</span><span class="cart-plus-one hidden-item">+1</span></button>
+            </div>
+          </div>
+        </article>
+
+        <article class="card" data-menu-category="drinks">
+          <span class="card-tag">Specialty Coffee &bull; Layered</span>
+          <h3>Hijayu Strawberry Coffee</h3>
+          <p>Rich, freshly extracted espresso layered over house-made sweet strawberry reduction and velvety chilled milk for a balanced fruity-roast finish.</p>
+          <div class="price-row">
+            <span class="price-tag">RM 15.50</span>
+            <div class="cart-quantity-control" data-cart-item="strawberry-coffee" data-item-name="Hijayu Strawberry Coffee" data-item-price="15.50">
+              <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Strawberry Coffee" onclick="window.changeCartQuantity('strawberry-coffee', -1);">−1</button>
+              <span class="cart-quantity" aria-live="polite">0</span>
+              <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Strawberry Coffee to pre-order" onclick="window.changeCartQuantity('strawberry-coffee', 1);"><span class="cart-add-label">+ Add to Pre-Order</span><span class="cart-plus-one hidden-item">+1</span></button>
+            </div>
+          </div>
+        </article>
+
+        <article class="card" data-menu-category="drinks">
+          <span class="card-tag">Specialty Drink &bull; Tropical</span>
+          <h3>Hijayu Pandan Mix Fruit</h3>
+          <p>Fragrant pandan-infused signature beverage crowned with a colourful medley of fresh tropical mixed fruits for hot Terengganu afternoons.</p>
+          <div class="price-row">
+            <span class="price-tag">RM 15.50</span>
+            <div class="cart-quantity-control" data-cart-item="pandan-mix-fruit" data-item-name="Hijayu Pandan Mix Fruit" data-item-price="15.50">
+              <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Pandan Mix Fruit" onclick="window.changeCartQuantity('pandan-mix-fruit', -1);">−1</button>
+              <span class="cart-quantity" aria-live="polite">0</span>
+              <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Pandan Mix Fruit to pre-order" onclick="window.changeCartQuantity('pandan-mix-fruit', 1);"><span class="cart-add-label">+ Add to Pre-Order</span><span class="cart-plus-one hidden-item">+1</span></button>
+            </div>
+          </div>
+        </article>
+      </section>
+    </div>
+
+    <!-- ==================== VIEW 3: RESERVATION FORM (reservation.html) ==================== -->
+    <div id="view-reservation" class="spa-page-view">
+      <section class="page-banner">
+        <div>
+          <h1>Hijayu Caf&eacute; Table Reservation &amp; Pre-Order Form</h1>
+          <p>Complete the 9-element form below to reserve your table at Kg. Sepetir Rendang and pre-order our signature dishes.</p>
+        </div>
+        <label for="gs-tab-availability" class="btn btn-secondary" onclick="window.switchPage('availability');">Check Zone Capacities</label>
+      </section>
+
+      <section class="grid-2">
+        <div class="form-card">
+          <div class="section-header">
+            <h2>Guest &amp; Table Booking Details</h2>
+            <p>Open Monday&ndash;Thursday &amp; Saturday&ndash;Sunday (12:30 PM &ndash; 10:30 PM; Closed Fridays).</p>
+          </div>
+
+          <form id="cafe-reservation-form" action="payment.html" method="get" onsubmit="return window.handleReservationSubmit(event);" onreset="window.handleReservationReset();">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="res-name">1. Full Name (*)</label>
+                <input type="text" id="res-name" name="customer_name" class="form-control" placeholder="e.g. Amirul Adli Bin Rosazlan" required>
+              </div>
+              <div class="form-group">
+                <label for="res-email">2. Email Address (*)</label>
+                <input type="email" id="res-email" name="customer_email" class="form-control" placeholder="e.g. s79559@ocean.umt.edu.my" required>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="res-phone">3. Mobile / WhatsApp Number (*)</label>
+                <input type="tel" id="res-phone" name="customer_phone" class="form-control" placeholder="e.g. 017-5512339" required>
+              </div>
+              <div class="form-group">
+                <label for="res-date">4. Reservation Date (*)</label>
+                <input type="date" id="res-date" name="reservation_date" class="form-control" value="2026-11-15" required>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="res-time">5. Arrival Time Slot (Select List) (*)</label>
+                <select id="res-time" name="arrival_time" class="form-control" required>
+                  <option value="12:30 PM" selected>12:30 PM - Lunch Opening Slot</option>
+                  <option value="01:30 PM">01:30 PM - Peak Afternoon Lunch</option>
+                  <option value="03:30 PM">03:30 PM - Quiet Afternoon Tea &amp; Study</option>
+                  <option value="06:30 PM">06:30 PM - Early Family Dinner</option>
+                  <option value="08:30 PM">08:30 PM - Evening Group Gathering</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="res-guests">6. Number of Guests (Select List) (*)</label>
+                <select id="res-guests" name="party_size" class="form-control" onchange="window.updateReservationEstimate();" required>
+                  <option value="1">1 Person (Solo Dining / Study)</option>
+                  <option value="2" selected>2 Guests (Couple / Duo Table)</option>
+                  <option value="4">4 Guests (Standard Booth)</option>
+                  <option value="6">6 Guests (Family Siakap Table)</option>
+                  <option value="8">8-10 Guests (Large Group Dining Zone)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>7. Preferred Seating Zone at Hijayu Caf&eacute; (Radio Buttons) (*)</label>
+              <div class="option-group">
+                <label class="option-label">
+                  <input type="radio" name="seating_zone" value="Main Indoor Dining Hall" data-zone-fee="0" onchange="window.updateReservationEstimate();" checked>
+                  Main Indoor Dining Hall (RM 0 Booking Fee)
+                </label>
+                <label class="option-label">
+                  <input type="radio" name="seating_zone" value="Quiet Study & Work Zone" data-zone-fee="5" onchange="window.updateReservationEstimate();">
+                  Quiet Study Zone w/ Power Plugs (+RM 5.00)
+                </label>
+                <label class="option-label">
+                  <input type="radio" name="seating_zone" value="Cozy Garden Verandah" data-zone-fee="0" onchange="window.updateReservationEstimate();">
+                  Cozy Garden Verandah (RM 0)
+                </label>
+                <label class="option-label">
+                  <input type="radio" name="seating_zone" value="VIP Family & Group Room" data-zone-fee="15" onchange="window.updateReservationEstimate();">
+                  VIP Family &amp; Group Room (+RM 15.00)
+                </label>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>8. Pre-Order Signature Hijayu Items (Optional)</label>
+              <div class="reservation-cart-list">
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="green-fried-rice" data-item-name="Hijayu Green Fried Rice" data-item-price="21.00">
+                    <span class="reservation-cart-name">Hijayu Green Fried Rice (RM 21.00)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Green Fried Rice" onclick="window.changeCartQuantity('green-fried-rice', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Green Fried Rice to pre-order" onclick="window.changeCartQuantity('green-fried-rice', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-green-fried-rice">Notes for Hijayu Green Fried Rice</label>
+                  <textarea id="preorder-note-green-fried-rice" class="preorder-note" name="preorder_notes[green-fried-rice]" rows="2" placeholder="Spice level, ingredients, or other requests for this dish"></textarea>
+                </div>
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="siakap-green-curry" data-item-name="Hijayu Siakap Green Curry" data-item-price="61.00">
+                    <span class="reservation-cart-name">Hijayu Siakap Green Curry (RM 61.00)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Siakap Green Curry" onclick="window.changeCartQuantity('siakap-green-curry', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Siakap Green Curry to pre-order" onclick="window.changeCartQuantity('siakap-green-curry', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-siakap-green-curry">Notes for Hijayu Siakap Green Curry</label>
+                  <textarea id="preorder-note-siakap-green-curry" class="preorder-note" name="preorder_notes[siakap-green-curry]" rows="2" placeholder="Spice level, ingredients, or other requests for this dish"></textarea>
+                </div>
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="chicken-wings" data-item-name="Hijayu Chicken Wings" data-item-price="20.00">
+                    <span class="reservation-cart-name">Hijayu Chicken Wings (RM 20.00)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Chicken Wings" onclick="window.changeCartQuantity('chicken-wings', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Chicken Wings to pre-order" onclick="window.changeCartQuantity('chicken-wings', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-chicken-wings">Notes for Hijayu Chicken Wings</label>
+                  <textarea id="preorder-note-chicken-wings" class="preorder-note" name="preorder_notes[chicken-wings]" rows="2" placeholder="Spice level, ingredients, or other requests for this dish"></textarea>
+                </div>
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="best-friend" data-item-name="Hijayu Best Friend" data-item-price="20.00">
+                    <span class="reservation-cart-name">Hijayu Best Friend (RM 20.00)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Best Friend" onclick="window.changeCartQuantity('best-friend', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Best Friend to pre-order" onclick="window.changeCartQuantity('best-friend', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-best-friend">Notes for Hijayu Best Friend</label>
+                  <textarea id="preorder-note-best-friend" class="preorder-note" name="preorder_notes[best-friend]" rows="2" placeholder="Spice level, ingredients, or other requests for this dish"></textarea>
+                </div>
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="pandan-lemonade" data-item-name="Hijayu Pandan Lemonade" data-item-price="15.50">
+                    <span class="reservation-cart-name">Hijayu Pandan Lemonade (RM 15.50)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Pandan Lemonade" onclick="window.changeCartQuantity('pandan-lemonade', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Pandan Lemonade to pre-order" onclick="window.changeCartQuantity('pandan-lemonade', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-pandan-lemonade">Notes for Hijayu Pandan Lemonade</label>
+                  <textarea id="preorder-note-pandan-lemonade" class="preorder-note" name="preorder_notes[pandan-lemonade]" rows="2" placeholder="Sweetness, ice, or other requests for this drink"></textarea>
+                </div>
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="strawberry-coffee" data-item-name="Hijayu Strawberry Coffee" data-item-price="15.50">
+                    <span class="reservation-cart-name">Hijayu Strawberry Coffee (RM 15.50)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Strawberry Coffee" onclick="window.changeCartQuantity('strawberry-coffee', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Strawberry Coffee to pre-order" onclick="window.changeCartQuantity('strawberry-coffee', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-strawberry-coffee">Notes for Hijayu Strawberry Coffee</label>
+                  <textarea id="preorder-note-strawberry-coffee" class="preorder-note" name="preorder_notes[strawberry-coffee]" rows="2" placeholder="Sweetness, ice, or other requests for this drink"></textarea>
+                </div>
+                <div class="reservation-preorder-item">
+                  <div class="reservation-cart-item cart-quantity-control" data-cart-item="pandan-mix-fruit" data-item-name="Hijayu Pandan Mix Fruit" data-item-price="15.50">
+                    <span class="reservation-cart-name">Hijayu Pandan Mix Fruit (RM 15.50)</span>
+                    <button type="button" class="cart-step-button cart-minus hidden-item" aria-label="Remove one Hijayu Pandan Mix Fruit" onclick="window.changeCartQuantity('pandan-mix-fruit', -1);">−1</button>
+                    <span class="cart-quantity" aria-live="polite">0</span>
+                    <button type="button" class="cart-step-button cart-plus btn btn-dark" aria-label="Add Hijayu Pandan Mix Fruit to pre-order" onclick="window.changeCartQuantity('pandan-mix-fruit', 1);"><span class="cart-add-label">Add</span><span class="cart-plus-one hidden-item">+1</span></button>
+                  </div>
+                  <label class="preorder-note-label" for="preorder-note-pandan-mix-fruit">Notes for Hijayu Pandan Mix Fruit</label>
+                  <textarea id="preorder-note-pandan-mix-fruit" class="preorder-note" name="preorder_notes[pandan-mix-fruit]" rows="2" placeholder="Sweetness, ice, or other requests for this drink"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="res-notes">9. Special Requests for the Table (Optional)</label>
+              <textarea id="res-notes" name="special_requests" rows="3" class="form-control" placeholder="Add seating requests, baby chair needs, or other notes for your table..."></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Confirm Reservation &amp; Continue to Payment</button>
+              <button type="reset" class="btn btn-outline">Clear Form</button>
+            </div>
+          </form>
+        </div>
+
+        <div>
+          <div class="card">
+            <span class="card-tag">Live Pre-Order Summary</span>
+            <h3>Instant Reservation &amp; Meal Breakdown</h3>
+            <p>Pre-ordering signature dishes like <em>Hijayu Siakap Green Curry</em> allows our kitchen to begin preparation 15 minutes before your arrival.</p>
+            <div class="summary-box">
+              <h3>Estimated Booking Charges</h3>
+              <ul class="summary-list">
+                <li><span>Seating Zone Reservation Fee:</span> <strong id="est-zone-fee">RM 0.00</strong></li>
+                <li><span>Pre-Ordered Signature Items:</span> <strong id="est-food-total">RM 0.00</strong></li>
+                <li><span>Service Tax (SST Included):</span> <strong>RM 0.00</strong></li>
+              </ul>
+              <div class="summary-total">
+                <span>Estimated Total Payable:</span>
+                <span id="est-grand-total">RM 0.00</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <span class="card-tag">Booking Policy</span>
+            <h3>Table Hold &amp; Cancellation Guidelines</h3>
+            <p>Reserved tables at Hijayu Caf&eacute; are held for 15 minutes past the scheduled arrival time. To modify party size or cancel, please contact our desk at <strong>+60 19-925 7053</strong>.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ==================== VIEW 4: ZONES & SCHEDULE (availability.html) ==================== -->
+    <div id="view-availability" class="spa-page-view">
+      <section class="page-banner">
+        <div>
+          <h1>Hijayu Caf&eacute; Dining Zones, Capacities &amp; Operating Schedule</h1>
+          <p>Structured tabular breakdown of Hijayu Caf&eacute; seating zones at Kg. Sepetir Rendang, table codes, and daily dining shifts.</p>
+        </div>
+        <label for="gs-tab-reservation" class="btn btn-primary" onclick="window.switchPage('reservation');">Reserve Selected Zone &rarr;</label>
+      </section>
+
+      <section class="filter-bar" aria-label="Filter Table Zones">
+        <div>
+          <strong>Filter Table Matrix by Seating Zone:</strong>
+        </div>
+        <div>
+          <select id="zone-capacity-filter" class="form-control" onchange="window.handleZoneFilter(this);">
+            <option value="all">Show All Dining Zones (6 Zones / Configurations)</option>
+            <option value="indoor">Main Indoor Dining Hall</option>
+            <option value="study">Quiet Study &amp; Work Zone</option>
+            <option value="terrace">Cozy Garden Verandah</option>
+            <option value="vip">Family &amp; VIP Group Tables</option>
+          </select>
+        </div>
+      </section>
+
+      <div class="table-container">
+        <table id="zones-schedule-table" class="data-table">
+          <caption>Table 1: Hijayu Caf&eacute; Seating Zones, Table Allocation Codes, Capacities &amp; Pre-Order Recommendations</caption>
+          <thead>
+            <tr>
+              <th scope="col">Zone Code</th>
+              <th scope="col">Dining Zone Name</th>
+              <th scope="col">Table Numbers</th>
+              <th scope="col">Pax per Table</th>
+              <th scope="col">Recommended Signature Order</th>
+              <th scope="col">Zone Booking Fee</th>
+              <th scope="col">Peak Window Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-zone-type="indoor">
+              <td><strong>ZN-01</strong></td>
+              <td>Main Indoor Dining Hall (Duo Tables)</td>
+              <td>T01 &ndash; T08</td>
+              <td>1 &ndash; 2 Pax</td>
+              <td>Hijayu Green Fried Rice + Strawberry Coffee</td>
+              <td>RM 0.00 (Free)</td>
+              <td><span class="status-badge status-available">6 of 8 Tables Open</span></td>
+            </tr>
+            <tr data-zone-type="indoor">
+              <td><strong>ZN-02</strong></td>
+              <td>Main Indoor Booths (4-Seater)</td>
+              <td>T09 &ndash; T14</td>
+              <td>3 &ndash; 4 Pax</td>
+              <td>Hijayu Best Friend + Chicken Wings + Pandan Lemonade</td>
+              <td>RM 0.00 (Free)</td>
+              <td><span class="status-badge status-reserved">2 of 6 Tables Open</span></td>
+            </tr>
+            <tr data-zone-type="study">
+              <td><strong>ZN-03</strong></td>
+              <td>Quiet Study &amp; Laptop Work Pods</td>
+              <td>S01 &ndash; S04</td>
+              <td>1 &ndash; 2 Pax</td>
+              <td>Hijayu Strawberry Coffee + Hijayu Best Friend</td>
+              <td>RM 5.00 / Slot</td>
+              <td><span class="status-badge status-available">3 of 4 Pods Open</span></td>
+            </tr>
+            <tr data-zone-type="terrace">
+              <td><strong>ZN-04</strong></td>
+              <td>Cozy Garden Verandah (Outdoor)</td>
+              <td>G01 &ndash; G04</td>
+              <td>4 &ndash; 6 Pax</td>
+              <td>Hijayu Chicken Wings + Pandan Mix Fruit</td>
+              <td>RM 0.00 (Free)</td>
+              <td><span class="status-badge status-available">4 of 4 Tables Open</span></td>
+            </tr>
+            <tr data-zone-type="vip">
+              <td><strong>ZN-05</strong></td>
+              <td>Family Siakap Dining Zone A</td>
+              <td>FAM-A</td>
+              <td>6 &ndash; 8 Pax</td>
+              <td>Hijayu Siakap Green Curry (RM 61) + Green Fried Rice</td>
+              <td>RM 15.00 / 2 Hours</td>
+              <td><span class="status-badge status-reserved">Reserved 1:30 PM</span></td>
+            </tr>
+            <tr data-zone-type="vip">
+              <td><strong>ZN-06</strong></td>
+              <td>VIP Group Gathering Room B</td>
+              <td>FAM-B</td>
+              <td>8 &ndash; 10 Pax</td>
+              <td>2x Hijayu Siakap Green Curry + Pandan Lemonade Jugs</td>
+              <td>RM 15.00 / 2 Hours</td>
+              <td><span class="status-badge status-available">Available All Day</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <caption>Table 2: Hijayu Caf&eacute; Daily Operating Shifts (Mon&ndash;Thu &amp; Sat&ndash;Sun; Closed Fridays)</caption>
+          <thead>
+            <tr>
+              <th scope="col">Dining Shift</th>
+              <th scope="col">Time Window</th>
+              <th scope="col">Featured Hijayu Menu Lineup</th>
+              <th scope="col">Pre-Order Lead Time</th>
+              <th scope="col">UMT Student / Family Privilege</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Midday Lunch Rush</strong></td>
+              <td>12:30 PM &ndash; 03:00 PM</td>
+              <td>Hijayu Green Fried Rice (RM 21) &amp; Hijayu Pandan Lemonade (RM 15.50)</td>
+              <td>15 Minutes Before Arrival</td>
+              <td>Priority Table Hold for Pre-Ordered Mains</td>
+            </tr>
+            <tr>
+              <td><strong>Afternoon Chill &amp; Study</strong></td>
+              <td>03:00 PM &ndash; 06:00 PM</td>
+              <td>Hijayu Best Friend (RM 20), Strawberry Coffee (RM 15.50) &amp; Pandan Mix Fruit</td>
+              <td>10 Minutes Before Arrival</td>
+              <td>Waived Study Pod Fee with RM 30 Pre-Order</td>
+            </tr>
+            <tr>
+              <td><strong>Evening Family Dinner</strong></td>
+              <td>06:00 PM &ndash; 09:00 PM</td>
+              <td>Hijayu Siakap Green Curry (RM 61) &amp; Hijayu Chicken Wings (RM 20)</td>
+              <td>20 Minutes Before Arrival</td>
+              <td>Complimentary Keropok Appetizer for 6+ Pax</td>
+            </tr>
+            <tr>
+              <td><strong>Late Night Supper</strong></td>
+              <td>09:00 PM &ndash; 10:30 PM</td>
+              <td>Hijayu Chicken Wings, Hijayu Best Friend &amp; Specialty Drinks</td>
+              <td>10 Minutes Before Arrival</td>
+              <td>10% Off UMT Student Supper Group Bookings</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ==================== VIEW 5: GALLERY & VIDEO (gallery.html) ==================== -->
+    <div id="view-gallery" class="spa-page-view">
+      <input type="radio" name="css_gal_filter" id="gf-all" class="gs-hidden-toggle" checked>
+      <input type="radio" name="css_gal_filter" id="gf-interior" class="gs-hidden-toggle">
+      <input type="radio" name="css_gal_filter" id="gf-cuisine" class="gs-hidden-toggle">
+
+      <section class="page-banner">
+        <div>
+          <h1>Hijayu Caf&eacute; Visual Showcase, CSS Image Gallery &amp; Video Tour</h1>
+          <p>Explore our cozy Kg. Sepetir Rendang dining space and authentic Hijayu signature dishes powered by CSS3 transitions and multimedia.</p>
+        </div>
+        <div class="filter-buttons">
+          <label for="gf-all" class="btn btn-outline">All Photos (6)</label>
+          <label for="gf-interior" class="btn btn-outline">Dining Zones</label>
+          <label for="gf-cuisine" class="btn btn-outline">Hijayu Signature Cuisine</label>
+        </div>
+      </section>
+
+      <section class="css-gallery-grid" aria-label="CSS Image Gallery with Hover Transitions">
+        <article class="gallery-item" data-gallery-cat="cuisine">
+          <div class="gallery-thumb-wrapper">
+            <img data-img-slot="spread" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Hijayu Green Fried Rice and Hijayu Siakap Green Curry spread">
+          </div>
+          <div class="gallery-caption">
+            <span class="card-tag">Signature Mains &bull; RM 21 &ndash; RM 61</span>
+            <h3>Hijayu Green Fried Rice &amp; Siakap Green Curry</h3>
+            <p>Our iconic herb-infused <em>Nasi Goreng Hijau Hijayu</em> paired with whole barramundi simmered in rich green curry.</p>
+          </div>
+        </article>
+
+        <article class="gallery-item" data-gallery-cat="interior">
+          <div class="gallery-thumb-wrapper">
+            <img data-img-slot="interior" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Main Indoor Dining Hall at Hijayu Cafe with timber tables and warm lighting">
+          </div>
+          <div class="gallery-caption">
+            <span class="card-tag">Zone ZN-01 &bull; Indoor</span>
+            <h3>Cozy Main Indoor Dining Hall</h3>
+            <p>Calm, welcoming timber tables and pendant lighting in Kg. Sepetir Rendang tailored for families and UMT students.</p>
+          </div>
+        </article>
+
+        <article class="gallery-item" data-gallery-cat="cuisine">
+          <div class="gallery-thumb-wrapper">
+            <img data-img-slot="spread" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Hijayu Chicken Wings and Hijayu Best Friend platter">
+          </div>
+          <div class="gallery-caption">
+            <span class="card-tag">Sharing Favourites &bull; RM 20.00</span>
+            <h3>Hijayu Chicken Wings &amp; Hijayu Best Friend</h3>
+            <p>Golden herb-marinated grilled chicken wings and our signature <em>Hijayu Sahabat Baik</em> sharing platter.</p>
+          </div>
+        </article>
+
+        <article class="gallery-item" data-gallery-cat="interior">
+          <div class="gallery-thumb-wrapper">
+            <img data-img-slot="interior" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Barista and beverage preparation counter at Hijayu Cafe">
+          </div>
+          <div class="gallery-caption">
+            <span class="card-tag">Beverage Bar</span>
+            <h3>Pandan Cooler &amp; Espresso Bar</h3>
+            <p>Synchronized with online pre-orders so your <em>Hijayu Strawberry Coffee</em> and <em>Pandan Lemonade</em> are served fresh on arrival.</p>
+          </div>
+        </article>
+
+        <article class="gallery-item" data-gallery-cat="cuisine">
+          <div class="gallery-thumb-wrapper">
+            <img data-img-slot="spread" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Hijayu Pandan Lemonade, Strawberry Coffee, and Pandan Mix Fruit">
+          </div>
+          <div class="gallery-caption">
+            <span class="card-tag">Signature Drinks &bull; RM 15.50</span>
+            <h3>Pandan Lemonade, Strawberry Coffee &amp; Pandan Mix Fruit</h3>
+            <p>Three refreshing house beverages crafted with natural pandan essence, fresh tropical fruit, and layered espresso.</p>
+          </div>
+        </article>
+
+        <article class="gallery-item" data-gallery-cat="interior">
+          <div class="gallery-thumb-wrapper">
+            <img data-img-slot="interior" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Family and group dining zone at Hijayu Cafe">
+          </div>
+          <div class="gallery-caption">
+            <span class="card-tag">Zone ZN-05 &bull; Family Dining</span>
+            <h3>Family &amp; Group Gathering Tables</h3>
+            <p>Spacious 6-to-10-seater tables designed for group pre-orders and celebratory <em>Siakap Green Curry</em> dinners.</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="video-showcase-box">
+        <div class="section-header">
+          <h2>Bonus Feature: Embedded YouTube Caf&eacute; Ambiance &amp; Culinary Showcase</h2>
+          <p>Experience our relaxing cafe atmosphere and specialty beverage preparation before booking your table at Hijayu Caf&eacute;.</p>
+        </div>
+        <div class="video-frame-wrapper">
+          <iframe src="https://www.youtube.com/embed/bMbg81-efPQ" title="Specialty Coffee Barista Preparation and Cafe Ambiance Video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+      </section>
+    </div>
+
+    <!-- ==================== VIEW 6: CONTACT US (contact.html) ==================== -->
+    <div id="view-contact" class="spa-page-view">
+      <section class="page-banner">
+        <div>
+          <h1>Hijayu Caf&eacute; Contact Support, Location &amp; External Links</h1>
+          <p>Contact Hijayu Caf&eacute; by phone or explore our delivery listings and web design benchmarks.</p>
+        </div>
+      </section>
+
+      <section class="grid-3">
+        <article class="card">
+          <span class="card-tag">Phone &amp; WhatsApp</span>
+          <h3>Reservation &amp; Catering Desk</h3>
+          <p>Need to book a family table for <em>Hijayu Siakap Green Curry</em> or modify a pre-order? Call or message our team:</p>
+          <p>Phone / WhatsApp: <strong>+60 19-925 7053</strong></p>
+        </article>
+
+        <article class="card">
+          <span class="card-tag">Physical Location</span>
+          <h3>Kg. Sepetir Rendang, Kuala Nerus</h3>
+          <p>Lot 16716, Kg. Sepetir Rendang, 21300 Kuala Terengganu / Kuala Nerus, Terengganu Darul Iman (Opposite The Nelang Cafe, near UMT Campus).</p>
+          <p><strong>Operating Hours:</strong> Monday&ndash;Thursday &amp; Saturday&ndash;Sunday: 12:30 PM &ndash; 10:30 PM (Closed on Fridays)</p>
+        </article>
+
+        <article class="card">
+          <span class="card-tag">External Hyperlinks</span>
+          <h3>Official Listings &amp; Benchmarks</h3>
+          <p>Explore Hijayu Caf&eacute;'s verified food portals and the industry standards behind our web interface:</p>
+          <ul>
+            <li><a href="https://www.foodpanda.my/restaurant/l4jn/hijayu-cafe" target="_blank" rel="noopener">Hijayu Cafe Official Foodpanda Menu</a></li>
+            <li><a href="https://dineout.grab.com/my/en/restaurants/hijayu-cafe-kg-sepetir-rendang--1-C76HJ36HKFNWJ6" target="_blank" rel="noopener">Hijayu Cafe on Grab Dine Out</a></li>
+            <li><a href="https://terrymorris.net/bestpractices/" target="_blank" rel="noopener">Terry Morris Web Design Best Practices</a></li>
+            <li><a href="https://www.opentable.com/" target="_blank" rel="noopener">OpenTable Online Booking Benchmark</a></li>
+          </ul>
+        </article>
+      </section>
+
+      <div class="table-container">
+        <table class="data-table">
+          <caption>CSF3133 Project Development Team &amp; Module Ownership (Universiti Malaysia Terengganu)</caption>
+          <thead>
+            <tr>
+              <th scope="col">Matric No.</th>
+              <th scope="col">Group Member Name</th>
+              <th scope="col">Assigned System Modules &amp; UI Responsibilities</th>
+              <th scope="col">Contact Email</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>S79559</strong></td>
+              <td>Amirul Adli Bin Rosazlan</td>
+              <td>Lead UI/UX Architect, External CSS Design System (<code>styles.css</code>) &amp; Home Page (<code>index.html</code>)</td>
+              <td><a href="mailto:s79559@ocean.umt.edu.my">s79559@ocean.umt.edu.my</a></td>
+            </tr>
+            <tr>
+              <td><strong>S79175</strong></td>
+              <td>Muhammad Irfan Bin A Ghani</td>
+              <td>JavaScript Logic Developer (<code>script.js</code>), Online Reservation Form (<code>reservation.html</code>), &amp; Digital Menu Pre-Order Catalog (<code>menu.html</code>)</td>
+              <td><a href="mailto:s79175@ocean.umt.edu.my">s79175@ocean.umt.edu.my</a></td>
+            </tr>
+            <tr>
+              <td><strong>S79104</strong></td>
+              <td>Nur Sorfina Binti Hasmir</td>
+              <td>Visual Media &amp; Content Lead, Tabular Zones Schedule (<code>availability.html</code>), CSS Gallery &amp; Video Tour (<code>gallery.html</code>), &amp; Contact Page (<code>contact.html</code>)</td>
+              <td><a href="mailto:s79104@ocean.umt.edu.my">s79104@ocean.umt.edu.my</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-col">
+        <h3>Hijayu Caf&eacute; System</h3>
+        <p>Browse the Hijayu Cafe menu, reserve a table, and pre-order signature dishes online.</p>
+      </div>
+      <div class="footer-col">
+        <h3>Customer Navigation (6 Pages)</h3>
+        <ul>
+          <li><label for="gs-tab-index" class="footer-link-label" onclick="window.switchPage('index');">Home Page (index.html)</label></li>
+          <li><label for="gs-tab-menu" class="footer-link-label" onclick="window.switchPage('menu');">Digital Menu &amp; Pre-Order (menu.html)</label></li>
+          <li><label for="gs-tab-reservation" class="footer-link-label" onclick="window.switchPage('reservation');">Reserve a Dining Table (reservation.html)</label></li>
+          <li><label for="gs-tab-availability" class="footer-link-label" onclick="window.switchPage('availability');">Table Zones &amp; Schedule (availability.html)</label></li>
+          <li><label for="gs-tab-gallery" class="footer-link-label" onclick="window.switchPage('gallery');">CSS Gallery &amp; Video Tour (gallery.html)</label></li>
+          <li><label for="gs-tab-contact" class="footer-link-label" onclick="window.switchPage('contact');">Contact &amp; Team Info (contact.html)</label></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h3>Official Listings &amp; Standards</h3>
+        <ul>
+          <li><a href="https://www.foodpanda.my/restaurant/l4jn/hijayu-cafe" target="_blank" rel="noopener">Hijayu Cafe on Foodpanda Malaysia</a></li>
+          <li><a href="https://dineout.grab.com/my/en/restaurants/hijayu-cafe-kg-sepetir-rendang--1-C76HJ36HKFNWJ6" target="_blank" rel="noopener">Hijayu Cafe on Grab Dine Out</a></li>
+          <li><a href="https://terrymorris.net/bestpractices/" target="_blank" rel="noopener">Terry Morris Web Design Best Practices</a></li>
+          <li><a href="https://www.opentable.com/" target="_blank" rel="noopener">OpenTable Reservation Benchmark</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h3>Contact &amp; Project Team</h3>
+        <p>Lot 16716, Kg. Sepetir Rendang, 21300 Kuala Terengganu / Kuala Nerus, Terengganu</p>
+        <p>Tel / WhatsApp: +60 19-925 7053</p>
+        <p>CSF3133 Group K3: Amirul Adli (S79559), Muhammad Irfan (S79175), Nur Sorfina (S79104)</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; 2026 Hijayu Caf&eacute; | Universiti Malaysia Terengganu (CSF3133 Web-Based User Interface Design). All rights reserved.</span>
+      <span>Rendered for Mozilla Firefox, Google Chrome &amp; Microsoft Edge/IE Standards</span>
+    </div>
+  </footer>
+
+  <script>
+  (function() {
+    var heroData = "data:image/jpeg;base64,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";
+    var spreadData = "data:image/jpeg;base64,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";
+    var imgs = document.querySelectorAll("img[data-img-slot]");
+    for (var i = 0; i < imgs.length; i++) {
+      var slot = imgs[i].getAttribute("data-img-slot");
+      if (slot === "interior") imgs[i].src = heroData;
+      if (slot === "spread") imgs[i].src = spreadData;
+    }
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hijayu Caf&eacute; | Demo Checkout</title>
+  <style>
+    :root {
+      --espresso-dark: #143320;
+      --espresso-mid: #1E4D2B;
+      --caramel-gold: #C87D32;
+      --cream-bg: #FAF6F0;
+      --cream-card: #FFFFFF;
+      --text-primary: #1F1612;
+      --text-secondary: #5C493E;
+      --border-soft: #E5D9CC;
+      --shadow-md: 0 8px 24px rgba(44, 24, 16, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      padding: 28px 16px;
+      background: var(--cream-bg);
+      color: var(--text-primary);
+      font: 16px/1.6 "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    .checkout-shell {
+      width: min(100%, 980px);
+      margin: 0 auto;
+    }
+
+    .checkout-header {
+      margin-bottom: 22px;
+      color: var(--espresso-dark);
+    }
+
+    .checkout-header h1 {
+      font-size: clamp(1.7rem, 4vw, 2.2rem);
+      line-height: 1.2;
+    }
+
+    .checkout-header p {
+      margin-top: 6px;
+      color: var(--text-secondary);
+    }
+
+    .demo-notice {
+      margin-bottom: 20px;
+      padding: 14px 18px;
+      border: 1px solid #E6A15C;
+      border-radius: 10px;
+      background: #FFF4E5;
+      color: #713F12;
+      font-weight: 600;
+    }
+
+    .checkout-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(290px, 0.8fr);
+      gap: 22px;
+      align-items: start;
+    }
+
+    .checkout-card {
+      padding: 22px;
+      border: 1px solid var(--border-soft);
+      border-radius: 14px;
+      background: var(--cream-card);
+      box-shadow: var(--shadow-md);
+    }
+
+    .checkout-card h2 {
+      margin-bottom: 14px;
+      color: var(--espresso-dark);
+      font-size: 1.2rem;
+    }
+
+    .booking-details {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .detail {
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #FCF9F5;
+      overflow-wrap: anywhere;
+    }
+
+    .detail-label {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .order-list {
+      list-style: none;
+    }
+
+    .order-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .order-item-name {
+      font-weight: 700;
+    }
+
+    .order-item-note {
+      display: block;
+      color: var(--text-secondary);
+      font-size: 0.86rem;
+    }
+
+    .order-empty,
+    .table-note {
+      color: var(--text-secondary);
+    }
+
+    .order-total,
+    .fee-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 12px;
+    }
+
+    .fee-row {
+      color: var(--text-secondary);
+    }
+
+    .order-total {
+      margin-top: 8px;
+      border-top: 2px solid var(--border-soft);
+      color: var(--espresso-dark);
+      font-size: 1.15rem;
+      font-weight: 800;
+    }
+
+    .payment-method {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+      padding: 14px;
+      border: 1.5px solid var(--border-soft);
+      border-radius: 9px;
+      cursor: pointer;
+    }
+
+    .payment-method:has(input:checked) {
+      border-color: var(--espresso-mid);
+      background: #F3F8F3;
+    }
+
+    .payment-method input {
+      margin-top: 5px;
+      accent-color: var(--espresso-mid);
+    }
+
+    .payment-method strong,
+    .payment-method small {
+      display: block;
+    }
+
+    .payment-method small {
+      color: var(--text-secondary);
+    }
+
+    .wallet-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0 18px 28px;
+    }
+
+    .wallet-option {
+      padding: 7px 10px;
+      border: 1px solid var(--border-soft);
+      border-radius: 7px;
+      background: #FFFFFF;
+      color: var(--text-primary);
+      font: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .wallet-option[aria-pressed="true"] {
+      border-color: var(--espresso-mid);
+      background: var(--espresso-mid);
+      color: #FFFFFF;
+    }
+
+    .pay-button,
+    .back-link {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 46px;
+      padding: 10px 16px;
+      border: 0;
+      border-radius: 8px;
+      font: inherit;
+      font-weight: 700;
+      text-align: center;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .pay-button {
+      width: 100%;
+      background: var(--caramel-gold);
+      color: #FFFFFF;
+    }
+
+    .pay-button:hover {
+      background: #B06922;
+    }
+
+    .back-link {
+      margin-top: 12px;
+      border: 1px solid var(--border-soft);
+      background: #FFFFFF;
+      color: var(--espresso-mid);
+    }
+
+    .checkout-message {
+      display: none;
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid #86EFAC;
+      border-radius: 8px;
+      background: #DCFCE7;
+      color: #166534;
+      font-weight: 600;
+    }
+
+    .checkout-message.visible,
+    .checkout-error.visible {
+      display: block;
+    }
+
+    .checkout-error {
+      display: none;
+      margin-bottom: 16px;
+      padding: 14px;
+      border-radius: 8px;
+      background: #FEE2E2;
+      color: #991B1B;
+    }
+
+    @media (max-width: 720px) {
+      .checkout-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 18px 10px;
+      }
+
+      .checkout-card {
+        padding: 16px;
+      }
+
+      .booking-details {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="checkout-shell">
+    <header class="checkout-header">
+      <h1>Review &amp; Pay</h1>
+      <p>Demo checkout for your Hijayu Caf&eacute; table reservation and pre-order.</p>
+    </header>
+
+    <p class="demo-notice">Assignment demo only: no payment will be taken. Do not enter real card or account details.</p>
+    <p id="checkout-error" class="checkout-error" role="alert"></p>
+
+    <div class="checkout-grid">
+      <section class="checkout-card" aria-labelledby="booking-heading">
+        <h2 id="booking-heading">Reservation Details</h2>
+        <div id="booking-details" class="booking-details"></div>
+        <h2>Pre-Order</h2>
+        <ul id="order-list" class="order-list"></ul>
+        <div class="fee-row"><span>Table booking fee</span><strong id="zone-fee">RM 0.00</strong></div>
+        <div class="order-total"><span>Demo total</span><span id="order-total">RM 0.00</span></div>
+      </section>
+
+      <section class="checkout-card" aria-labelledby="payment-heading">
+        <h2 id="payment-heading">Choose a Demo Payment Method</h2>
+        <label class="payment-method">
+          <input type="radio" name="payment-method" value="card" checked>
+          <span>
+            <strong>Credit or Debit Card</strong>
+            <small>Visa, Mastercard, or other bank card</small>
+          </span>
+        </label>
+        <label class="payment-method">
+          <input type="radio" name="payment-method" value="wallet">
+          <span>
+            <strong>E-Wallet</strong>
+            <small>Choose a wallet below for the visual demo</small>
+          </span>
+        </label>
+        <div class="wallet-options" role="group" aria-label="Demo e-wallet">
+          <button type="button" class="wallet-option" aria-pressed="true">Touch 'n Go</button>
+          <button type="button" class="wallet-option" aria-pressed="false">GrabPay</button>
+          <button type="button" class="wallet-option" aria-pressed="false">DuitNow QR</button>
+        </div>
+        <p class="table-note">This page only previews payment choices. It does not collect card details or connect to a payment provider.</p>
+        <button id="demo-pay-button" class="pay-button" type="button">Complete Demo Order</button>
+        <p id="checkout-message" class="checkout-message" role="status"></p>
+        <a class="back-link" href="customer.html">Return to customer site</a>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      var checkoutData = null;
+      var errorEl = document.getElementById("checkout-error");
+      var rawData = window.sessionStorage.getItem("hijayuDemoCheckout");
+
+      if (rawData) {
+        try {
+          checkoutData = JSON.parse(rawData);
+        } catch (error) {
+          errorEl.textContent = "The reservation details could not be read. Please return to the customer site and try again.";
+          errorEl.classList.add("visible");
+        }
+      } else {
+        errorEl.textContent = "No reservation details were found. Start a reservation from the customer site to view checkout.";
+        errorEl.classList.add("visible");
+      }
+
+      function addDetail(container, label, value) {
+        var detail = document.createElement("div");
+        detail.className = "detail";
+        var labelEl = document.createElement("span");
+        labelEl.className = "detail-label";
+        labelEl.textContent = label;
+        var valueEl = document.createElement("strong");
+        valueEl.textContent = value || "Not provided";
+        detail.appendChild(labelEl);
+        detail.appendChild(valueEl);
+        container.appendChild(detail);
+      }
+
+      if (checkoutData && Array.isArray(checkoutData.items)) {
+        var details = document.getElementById("booking-details");
+        addDetail(details, "Booking reference", checkoutData.reference);
+        addDetail(details, "Guest", checkoutData.name);
+        addDetail(details, "Date & time", (checkoutData.date || "") + " at " + (checkoutData.time || ""));
+        addDetail(details, "Guests", checkoutData.guests);
+        addDetail(details, "Seating zone", checkoutData.zone);
+        if (checkoutData.tableNotes) addDetail(details, "Table notes", checkoutData.tableNotes);
+
+        var orderList = document.getElementById("order-list");
+        if (checkoutData.items.length) {
+          for (var i = 0; i < checkoutData.items.length; i++) {
+            var item = checkoutData.items[i];
+            var row = document.createElement("li");
+            row.className = "order-item";
+            var description = document.createElement("span");
+            var name = document.createElement("span");
+            name.className = "order-item-name";
+            name.textContent = item.quantity + " x " + item.name;
+            description.appendChild(name);
+            if (item.note) {
+              var note = document.createElement("span");
+              note.className = "order-item-note";
+              note.textContent = "Note: " + item.note;
+              description.appendChild(note);
+            }
+            var price = document.createElement("strong");
+            price.textContent = "RM " + (item.quantity * item.price).toFixed(2);
+            row.appendChild(description);
+            row.appendChild(price);
+            orderList.appendChild(row);
+          }
+        } else {
+          var empty = document.createElement("li");
+          empty.className = "order-empty";
+          empty.textContent = "No food items were added.";
+          orderList.appendChild(empty);
+        }
+
+        document.getElementById("zone-fee").textContent = "RM " + Number(checkoutData.zoneFee || 0).toFixed(2);
+        document.getElementById("order-total").textContent = "RM " + Number(checkoutData.total || 0).toFixed(2);
+      } else if (rawData && !errorEl.textContent) {
+        errorEl.textContent = "Reservation details are incomplete. Please return to the customer site and try again.";
+        errorEl.classList.add("visible");
+      }
+
+      var walletButtons = document.querySelectorAll(".wallet-option");
+      for (var j = 0; j < walletButtons.length; j++) {
+        walletButtons[j].addEventListener("click", function () {
+          for (var k = 0; k < walletButtons.length; k++) {
+            walletButtons[k].setAttribute("aria-pressed", walletButtons[k] === this ? "true" : "false");
+          }
+          var walletRadio = document.querySelector("input[name='payment-method'][value='wallet']");
+          walletRadio.checked = true;
+        });
+      }
+
+      document.getElementById("demo-pay-button").addEventListener("click", function () {
+        if (!checkoutData) return;
+        var method = document.querySelector("input[name='payment-method']:checked").value;
+        var paymentChoice = "Credit or Debit Card";
+        if (method === "wallet") {
+          var selectedWallet = document.querySelector(".wallet-option[aria-pressed='true']");
+          paymentChoice = selectedWallet ? selectedWallet.textContent : "E-Wallet";
+        }
+        var message = document.getElementById("checkout-message");
+        message.textContent = "Demo order " + checkoutData.reference + " confirmed using " + paymentChoice + ". No payment was processed.";
+        message.classList.add("visible");
+        window.sessionStorage.removeItem("hijayuDemoCheckout");
+      });
+    })();
+  </script>
+</body>
+</html>
